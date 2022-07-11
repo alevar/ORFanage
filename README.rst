@@ -35,7 +35,7 @@ If you want to build it from source, we recommend cloning the git repository as 
     $ cmake -DCMAKE_BUILD_TYPE=Release -G "Unix Makefiles" .
     $ make -j4
 
-For a fully static build -DTIEBRUSH_STATIC_BUILD=1 needs to be added to the list of arguments in the cmake command.
+For a fully static build -DORFANAGE_STATIC_BUILD=1 needs to be added to the list of arguments in the cmake command.
 
 By default make install will likely require administrative privileges. To specify custom installation path -DCMAKE_INSTALL_PREFIX=<custom/installation/path> needs to be added to the list of arguments in the cmake command.
 
