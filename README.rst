@@ -18,7 +18,7 @@ identify cases of known ORFs fitting the query transcript both with and without 
 introduced by additional exons, alternative start and end sites, etc. ORFanage is also designed
 to quantify any changes to the reference annotation which are introduced by the splice variation.
 
-Varabyou, A., Erdogdu, B., Pockrandt, C., Rincon, N., Salzberg, S. L., & Pertea, M. (2022). **RFanage: Ultra-efficient and sensitive method to search for ORFs in spliced genomes guided by reference annotation to maximize protein similarity within genes.**. `...`, ...
+Varabyou, A., Erdogdu, B., Pockrandt, C., Rincon, N., Salzberg, S. L., & Pertea, M. (2022). **ORFanage: Ultra-efficient and sensitive method to search for ORFs in spliced genomes guided by reference annotation to maximize protein similarity within genes.**. `...`, ...
 
 Installation
 ^^^^^^^^^^^^

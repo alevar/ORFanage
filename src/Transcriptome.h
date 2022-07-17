@@ -86,7 +86,7 @@ public:
 
     uint32_t slen() const{return (this->end + 1) - this->start;}
 
-    int intersect(SEGTP& s2,SEGTP& res){ // TODO: need to add phase information when available
+    int intersect(SEGTP& s2,SEGTP& res){
         int is = this->start_set()?std::max(this->start,s2.get_start()):s2.get_start();
         int ie = std::min(this->end,s2.get_end());
         if(is<=ie){
@@ -221,7 +221,7 @@ public:
         }
         std::vector<SEGTP> tmp;
         for(auto c : this->chain){ // not reference - the copy is being modified
-            if(c.get_start()<=start && c.get_end()>start){
+            if(c.get_start()<=start && c.get_end()>=start){
                 c.set_start(start);
             }
             if(c.get_end()>=end){
@@ -424,11 +424,14 @@ public:
     }
 
     void trim_to_pos(int start_nt_pos, int end_nt_pos,char strand){ // from stop indicates whether we are trimming the end or the start of the sequence
+#ifdef DEBUG
+        assert(end_nt_pos>=start_nt_pos);
+#endif
         int start_pos = this->nt2genome(start_nt_pos,strand);
         int end_pos = this->nt2genome(end_nt_pos,strand);
         int s = std::min(start_pos,end_pos);
         int e = std::max(start_pos,end_pos);
-        int len = this->cut(s,e); // TODO: min max is inefficient
+        int len = this->cut(s,e);
         int new_start_phase = start_nt_pos%3;
         this->assign_phase(strand,new_start_phase);
     }
@@ -474,7 +477,7 @@ public:
 
         int c1_i=0,c2_i=0;
         SEGTP cur_c1 = this->chain[c1_i];
-        SEGTP cur_c2 = this->chain[c2_i];
+        SEGTP cur_c2 = t[c2_i];
 
         SEGTP inter;
         while(true){
@@ -660,8 +663,8 @@ public:
     void extend_to_start(int new_start=-1);
     uint inframe_len(TX* t);
     void extend_to_start(TX* t);
-    void rescue_cds();
-    void rescue_cds(TX* t);
+    int rescue_cds();
+    int rescue_cds(TX* t);
     void load_seq();
     bool seq_loaded(){return !this->seq.empty();}
     uint aa_len(){return this->seq.empty() ? this->cds_alen() : this->seq.cds_aa_len();}

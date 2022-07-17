@@ -4,4 +4,6 @@ build
 res
 data
 notebooks
+experiments
 *.ipynb
+

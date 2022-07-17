@@ -88,10 +88,10 @@ void TX::build_cds(){
     }
     if(this->cds_phase!=0){
         if(this->strand=='+'){
-            this->cds_start+=cds_phase;
+            this->cds_start=this->exons.nt2genome(this->exons.genome2nt(this->cds_start,this->strand)+cds_phase,this->strand);
         }
         else{
-            this->cds_end-=cds_phase;
+            this->cds_end=this->exons.nt2genome(this->exons.genome2nt(this->cds_end,this->strand)+cds_phase,this->strand);
         }
         this->cds_phase = 0;
     }
@@ -163,10 +163,14 @@ int TX::adjust_stop(){ // adjust the chain coordinates to stop at the first stop
 
     int prev_nt_len = this->seq.cds_nt_len();
     bool trimmed = this->seq.trim_to_stop();
+    if(this->seq.cds_nt_len()<3){
+        this->remove_cds();
+        return -1;
+    }
     if(trimmed){
         this->cds.trim_to_pos(0,this->seq.cds_nt_len()-1,this->strand);
         this->cds_start = this->cds.get_start();
-        this->cds_end = this->cds.get_end(); // todo: should we remove separate declations for cds_start and end (and exon start/ends as well?)
+        this->cds_end = this->cds.get_end();
     }
     int new_nt_len = this->seq.cds_nt_len();
     return prev_nt_len-new_nt_len;
@@ -253,7 +257,7 @@ void TX::extend_to_stop(){ // searches downstream of the CDS for the next stop c
         return;
     }
     std::vector<uint> stops;
-    uint res = this->seq.find_inframe_codon('.',stops,this->seq.get_cds_end()+1,true,true);
+    uint res = this->seq.find_inframe_codon('.',';',stops,this->seq.get_cds_end()+1,true,true);
     if(res!=0){ // stop is found - adjust accordingly
         int chain_extension_len = (stops[0]+2)-this->seq.get_cds_end();
         this->seq.extend_to_pos(stops[0]+2);
@@ -265,13 +269,13 @@ void TX::extend_to_stop(){ // searches downstream of the CDS for the next stop c
     return;
 }
 // this version will search for the first available start codon resulting in the longest possible ORF
-void TX::extend_to_start(int new_start){ // searches upstream for the available start codons // TODO: figure out genomic and exonic new_start offsets
+void TX::extend_to_start(int new_start){ // searches upstream for the available start codons
     if(new_start==-1){ // start coordinate is not provided - search
         if(this->seq.get_aa(0)=='M'){ // start already present
             return;
         }
         std::vector<uint> starts;
-        uint res = this->seq.find_inframe_codon('M',starts,this->seq.get_cds_start(),false,true);
+        uint res = this->seq.find_inframe_codon('M','.',starts,this->seq.get_cds_start(),false,true);
         if(res==0){
             return;
         }
@@ -281,7 +285,7 @@ void TX::extend_to_start(int new_start){ // searches upstream for the available 
     int chain_extension_len = this->seq.get_cds_start()-new_start;
     this->seq.extend_to_pos(new_start);
     // modify the chain accordinly
-    this->extend_cds_chain(chain_extension_len,this->strand=='-'); // TODO: is this correct? should we instead have a function which extends the chain to new coordinates?
+    this->extend_cds_chain(chain_extension_len,this->strand=='-');
     this->cds_start = this->cds.get_start();
     this->cds_end = this->cds.get_end();
     return;
@@ -295,7 +299,7 @@ void TX::extend_to_start(TX* ref_tx){ // extends to start while comparing to the
 
     // otherwise - search for the best start codon
     std::vector<uint> transcriptomic_starts;
-    uint res = this->seq.find_inframe_codon('M',transcriptomic_starts,this->seq.get_cds_start(),false,false);
+    uint res = this->seq.find_inframe_codon('M','.',transcriptomic_starts,this->seq.get_cds_start(),false,false);
     if(res==0){return;}
 
     int max_chain_extension_len = this->seq.get_cds_start()-transcriptomic_starts.back();
@@ -310,7 +314,7 @@ void TX::extend_to_start(TX* ref_tx){ // extends to start while comparing to the
     int old_start = this->strand=='+' ? ref_tx->get_cds_start() : ref_tx->get_cds_end();
     for(auto& s : genomic_starts){
         if(s==old_start){
-            extend_to_start(transcriptomic_starts[si]); // TODO: we need an option in extend_to_start to extend to the farthest start instead of the best match
+            extend_to_start(transcriptomic_starts[si]);
             return;
         }
         si++;
@@ -374,7 +378,7 @@ uint TX::inframe_len(TX* t){ // it doesn't matter that we do this stranded - eit
 
     // compute intersection (q and t only)
     CHAIN intersected_chain;
-    this->cds.intersection(t->cds,intersected_chain); // TODO: needs to assign phase here
+    this->cds.intersection(t->cds,intersected_chain);
 
     // iterate over them - check phase in both - continue
     for(auto& c : intersected_chain){ // get phase at position for 1
@@ -386,29 +390,39 @@ uint TX::inframe_len(TX* t){ // it doesn't matter that we do this stranded - eit
     }
     return res;
 }
-void TX::rescue_cds(TX* t){
+int TX::rescue_cds(TX* t){
     if(this->seq.cds_nt_len()<3){
         this->remove_cds();
-        return;
+        return 0;
     }
 
     adjust_stop();
+    if(this->cds_len()==0){
+        this->remove_cds();
+        return 0;
+    }
     extend_to_stop();
     extend_to_start(t);
     adjust_start();
     this->set_cds_phase(0);
+    return 1;
 }
-void TX::rescue_cds(){
+int TX::rescue_cds(){
     if(this->seq.cds_nt_len()<3){
         this->remove_cds();
-        return;
+        return 0;
     }
 
     adjust_stop();
+    if(this->cds_len()==0){
+        this->remove_cds();
+        return 0;
+    }
     extend_to_stop(); // TODO: stop re-iterating over the chains. set the last coordinate if available (optional argument)
     extend_to_start();
     adjust_start();
     this->set_cds_phase(0);
+    return 1;
 }
 void TX::set_cds_phase(int start_phase){
     this->cds_phase=start_phase;
@@ -460,7 +474,7 @@ Score TX::score(TX& t) {
         } else if (mc.get_phase() == 0) { // matching positions between query and template
             s.num_bp_match += mc.slen();
             if (q_frame % 3 == q_frame % 3) {
-                s.num_bp_inframe += mc.slen();
+                s.num_bp_inframe += mc.slen(); // TODO: shouldn't this be stranded?
             } else {
                 s.num_bp_outframe += mc.slen();
             }
@@ -680,15 +694,7 @@ uint Transcriptome::bundleup(bool use_id){ // create bundles and return the tota
     int cur_seqid = -1;
     std::string seqid_name;
 
-    // TODO: how do we form bundles with the use of gene ids?
-    //  1. we need to extract gene ids in the first place
-    //  2. what if we first form bundles based on queries only use the gene ids and then iterate over all references and add them accordingly based on overlap?
-    //      - how do we find the overlaps then?
-    //      -
-
-    //    The issue is that wehave to store pointer to the bundle for each transcripts which requires that a transcript can only belong to one bundle - not many...
-
-    for(auto& t : this->tx_vec){ // TODO: add ability to form bundles based on gene ids instead of overlaps
+    for(auto& t : this->tx_vec){
         if(!this->bundles.back().can_add(&t,use_id)){
             if(this->check_ref){
                 if(t.get_seqid()!=cur_seqid){
@@ -729,7 +735,7 @@ void Transcriptome::build_cds_chains(){
         if(tx.has_cds() && tx.is_template()) {
 #ifdef DEBUG
             if(std::strcmp(tx.get_tid().c_str(),"ENST00000313599.8")==0){
-                std::cout<<"found"<<std::endl;
+                std::cout<<"found 2"<<std::endl;
             }
 #endif
             tx.build_cds();

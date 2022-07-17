@@ -15,12 +15,15 @@ set(CMAKE_CXX_STANDARD 11)
 
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive -DNOCURL=1")
 
-add_compile_options(-fsanitize=address)
-add_compile_options(-fsanitize=leak)
-add_compile_options(-fsanitize=undefined)
-add_link_options(-fsanitize=address)
-add_link_options(-fsanitize=leak)
-add_link_options(-fsanitize=undefined)
+if(CMAKE_BUILD_TYPE MATCHES Debug)
+    add_compile_options("$<$<CONFIG:DEBUG>:-DDEBUG>")
+    add_compile_options(-fsanitize=address)
+    add_compile_options(-fsanitize=leak)
+    add_compile_options(-fsanitize=undefined)
+    add_link_options(-fsanitize=address)
+    add_link_options(-fsanitize=leak)
+    add_link_options(-fsanitize=undefined)
+endif()
 
 include_directories(src)
 
@@ -131,11 +134,11 @@ add_executable(orfanage
         ${CMAKE_SOURCE_DIR}/src/aln.hpp
         ${CMAKE_SOURCE_DIR}/main.cpp)
 
-if(CMAKE_BUILD_TYPE MATCHES Debug)
-    target_compile_definitions(orfanage PUBLIC DEBUG=1)
-elseif(CMAKE_BUILD_TYPE MATCHES Release)
-    target_compile_definitions(orfanage PUBLIC DEBUG=0)
-endif()
+#if(CMAKE_BUILD_TYPE MATCHES Debug)
+#    target_compile_definitions(orfanage PUBLIC DEBUG=1)
+#elseif(CMAKE_BUILD_TYPE MATCHES Release)
+#    target_compile_definitions(orfanage PUBLIC DEBUG=0)
+#endif()
 
 add_dependencies(orfanage htslib libBigWig)
 

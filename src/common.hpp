@@ -324,7 +324,7 @@ public:
 #ifdef DEBUG
         assert(start_pos<this->exon_nt.size());
         assert(end_pos<this->exon_nt.size());
-        assert(end_pos>=start_pos+3);
+        assert(((end_pos+1)-start_pos)>=3);
         assert(((end_pos+1)-start_pos)%3==0);
 #endif
         this->cds_start = start_pos;
@@ -416,22 +416,27 @@ public:
         return false;
     }
     // find all instances of a codon within the same frame and saves it into a list. the positions in the list are with respect to the nucleotide sequence
-    uint find_inframe_codon(char c,std::vector<uint>& positions, uint start_idx, bool forward, bool first=false){
+    uint find_inframe_codon(char c,char stop_c,std::vector<uint>& positions, uint start_idx, bool forward, bool first=false){
         positions.clear();
         std::string cur_codon;
         std::string cur_aa;
 
         uint i=start_idx;
+        char cur_c;
         while(true){
             if(!(i<this->exon_nt.size() && i>=0)){
                 break;
             }
             cur_codon = this->exon_nt.substr(i,3);
-            if(codon_map[cur_codon]==c){
-                positions.push_back(i);
-            }
-            if(first){ // if true - only report the first occurrence
+            cur_c = codon_map[cur_codon];
+            if(cur_c==stop_c){
                 break;
+            }
+            if(cur_c==c){
+                positions.push_back(i);
+                if(first){ // if true - only report the first occurrence
+                    break;
+                }
             }
 
             i = forward ? i+3 : i-3;

@@ -102,7 +102,7 @@ int run(){
     }
     if(global_params.percent_ident>-1){
         assert(!global_params.reference_fasta_fname.empty());
-        transcriptome.set_aligner(mat50,aa_table,global_params.gapo,global_params.gape); // TODO: need better gapo/gape
+        transcriptome.set_aligner(mat50,aa_table,global_params.gapo,global_params.gape);
     }
 
     std::cerr<<"loading reference transcriptomes"<<std::endl;
@@ -152,7 +152,6 @@ int run(){
         if(!bundle_it->has_template() || !bundle_it->has_query()){
             continue;
         }
-        // TODO: it might be much more efficient to evaluate queries one by one and make decisions that way instead of populating a matrix with all queries, since query evaluation does not depend on ather queries (at least now it doesn't)
         Scores scs;
         TX *q,*t;
         Finder* fndr = global_params.percent_ident>-1 ? transcriptome.get_aligner() : nullptr;
@@ -163,12 +162,6 @@ int run(){
             q=bundle_it->operator[](qi);
             if(q->is_template()){continue;}
             q->remove_cds();
-#ifdef DEBUG
-            if(std::strcmp(q->get_tid().c_str(),"rna-XM_011520620.1")==0){
-                std::cout<<"found"<<std::endl;
-            }
-//            std::cout<<q->get_tid()<<std::endl;
-#endif
 
             for(int ti=0;ti<bundle_it->size();ti++){
                 t=bundle_it->operator[](ti);
@@ -177,7 +170,7 @@ int run(){
                 if(intlen==0){continue;}
                 scs.emplace_back(std::vector<std::pair<TX,Score>>{});
 
-                std::unordered_set<int> orf_starts; // TODO: replace with ends instead - then need to make sure the one with longest orf is selected // stores all curent start positions. If the same position is found twice - is duplicated (assuming 0 phase)
+                std::unordered_set<int> orf_starts;
                 std::pair<std::unordered_set<int>::iterator,bool> os_rit;
 
                 // now we need to reconstruct a transcript within the query exon chain for each segment of the template ORF
@@ -185,7 +178,7 @@ int run(){
                     // TODO: does it work without sequence avaialble?
 
 #ifdef DEBUG
-                    if(std::strcmp(q->get_tid().c_str(),"CHS.34708.1")==0){ // rna-XM_011520617.2
+                    if(std::strcmp(q->get_tid().c_str(),"rna-XM_011531482.2")==0){ // rna-XM_011520617.2
                         std::cout<<"found"<<std::endl;
                     }
 #endif
@@ -194,13 +187,16 @@ int run(){
 #ifdef DEBUG
                     assert(seg_phase>=0 && seg_phase<3);
 #endif
+                    if(s.slen()<3){continue;}
                     s.set_phase(seg_phase);
                     TX qseg = *q;
                     qseg.set_cds_start(s.get_start());
                     qseg.set_cds_end(s.get_end());
                     qseg.set_cds_phase(s.get_phase());
                     qseg.build_cds();
+                    if(qseg.cds_len()<3){continue;}
                     qseg.correct_chain_len();
+                    if(qseg.cds_len()<3){continue;}
 
                     // if reference is provided
                     if(!global_params.reference_fasta_fname.empty()) {
@@ -209,9 +205,9 @@ int run(){
                             continue;
                         }
                         qseg.load_seq();
-                        // TODO - try passing some of the filters to this function to exit prematurely when conditions are met
 
-                        qseg.rescue_cds(t);
+                        int ret = qseg.rescue_cds(t);
+                        if(!ret){continue;}
 
                         if(qseg.get_aa().front()!='M' ||
                            qseg.get_aa().back()!='.'){
@@ -220,11 +216,15 @@ int run(){
                         }
                     }
 
+#ifdef DEBUG
+                    assert(qseg.get_aa().find(".")==qseg.get_aa().size()-1); // assert that no premature stop-codons are found
+#endif
+
                     if(qseg.cds_chain()->clen()<global_params.cds_minlen){continue;}
 
-                    Score qseg_score = qseg.score(*t); // TODO:make sure these checks always return true if not set in parameters
+                    Score qseg_score = qseg.score(*t);
                     if(qseg_score.lpd<global_params.len_perc_diff ||
-                       qseg_score.ilpd<global_params.len_frame_perc_diff || // TODO: make sure the inframe/outframe is computed correctly without reference
+                       qseg_score.ilpd<global_params.len_frame_perc_diff ||
                        qseg_score.mlpd<global_params.len_match_perc_diff){
                         continue;
                     }
@@ -246,8 +246,6 @@ int run(){
 #endif
                 segments.clear();
             }
-
-            // TODO: try making early decisions before aligning anything at all
 
             // check percent identity if requested
             if(global_params.percent_ident>-1) {
@@ -276,10 +274,10 @@ int run(){
 
             // TODO: PPP should realistically only run if we don't find anything else
             //   but also when validation is enabled
-            // or as a validation for any novel segments of the ORF
-            // PPP does not require alignment (plus we don't know which template to use for alignment in the first place)
-            // We only need to run if no good/suitable orfanage result is available
-            // if phylocsf is requested - compute for the current qseg and add all to the current list for evaluation
+            //   or as a validation for any novel segments of the ORF
+            //   PPP does not require alignment (plus we don't know which template to use for alignment in the first place)
+            //   We only need to run if no good/suitable orfanage result is available
+            //   if phylocsf is requested - compute for the current qseg and add all to the current list for evaluation
             if(!global_params.ppp_track_fname.empty()){
                 if(global_params.ppp_mode==LONGEST || global_params.ppp_mode==BEST){
                     std::pair<SEGTP,float> ppp_chain = transcriptome.compute_tx_cds_ppp(*q);
@@ -424,8 +422,6 @@ int run(){
         }
     }
 
-    // TODO: how can we best search for the start coordinate?
-
     return 0;
 }
 
@@ -448,8 +444,6 @@ int main(int argc, char** argv) {
     args.add_option("nc",ArgParse::Type::FLAG,"Write transcripts which do not have CDS as well",ArgParse::Level::GENERAL,false);
     args.add_option("threads",ArgParse::Type::INT,"Number of threads to run in parallel",ArgParse::Level::GENERAL,false);
     args.add_option("use_id",ArgParse::Type::BOOL,"If enabled, only transcripts with the same gene ID from the query file will be used to form a bundle. In this mode the same template transcript may be used in several bundles, if overlaps transcripts with different gene_ids.",ArgParse::Level::GENERAL,false);
-
-    // TODO: add mode to select by the number of matches/inframe/etc instead of percent
     
     // Alignment
     args.add_option("pi",ArgParse::Type::INT,"Percent identity between the query and template sequences. This option requires --reference parameter to be set. If enabled - will run alignment between passing pairs.", ArgParse::Level::GENERAL,false);
