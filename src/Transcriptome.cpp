@@ -473,7 +473,7 @@ Score TX::score(TX& t) {
             t_frame += mc.slen();
         } else if (mc.get_phase() == 0) { // matching positions between query and template
             s.num_bp_match += mc.slen();
-            if (q_frame % 3 == q_frame % 3) {
+            if (q_frame % 3 == t_frame % 3) {
                 s.num_bp_inframe += mc.slen(); // TODO: shouldn't this be stranded?
             } else {
                 s.num_bp_outframe += mc.slen();

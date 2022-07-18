@@ -178,7 +178,7 @@ int run(){
                     // TODO: does it work without sequence avaialble?
 
 #ifdef DEBUG
-                    if(std::strcmp(q->get_tid().c_str(),"rna-XM_011531482.2")==0){ // rna-XM_011520617.2
+                    if(std::strcmp(q->get_tid().c_str(),"rna-XM_024452071.1")==0){ // rna-XM_011520617.2
                         std::cout<<"found"<<std::endl;
                     }
 #endif
@@ -595,7 +595,7 @@ int main(int argc, char** argv) {
     global_params.cds_minlen = args.is_set("minlen") ? args.get_int("minlen") : 36;
     global_params.len_perc_diff = args.is_set("lpd") ? args.get_int("lpd") : 50;
     global_params.len_frame_perc_diff = args.is_set("ilpd") ? args.get_int("ilpd") : 50;
-    global_params.len_match_perc_diff = args.is_set("mlpd") ? args.get_int("mpd") : 50;
+    global_params.len_match_perc_diff = args.is_set("mlpd") ? args.get_int("mlpd") : 50;
     global_params.percent_ident = args.is_set("pi") ? args.get_int("pi") : -1;
 
     global_params.gapo = args.is_set("gapo") ? args.get_int("gapo") : 4;

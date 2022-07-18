@@ -267,33 +267,6 @@ static constexpr int8_t aa_table[128] = {
 
 static std::map<std::string,char> codon_map = {{"AAA",'K'},{"AAC",'N'},{"AAG",'K'},{"AAR",'K'},{"AAT",'N'},{"AAY",'N'},{"ACA",'T'},{"ACB",'T'},{"ACC",'T'},{"ACD",'T'},{"ACG",'T'},{"ACH",'T'},{"ACK",'T'},{"ACM",'T'},{"ACN",'T'},{"ACR",'T'},{"ACS",'T'},{"ACT",'T'},{"ACV",'T'},{"ACW",'T'},{"ACY",'T'},{"AGA",'R'},{"AGC",'S'},{"AGG",'R'},{"AGR",'R'},{"AGT",'S'},{"AGY",'S'},{"ATA",'I'},{"ATC",'I'},{"ATG",'M'},{"ATH",'I'},{"ATM",'I'},{"ATT",'I'},{"ATW",'I'},{"ATY",'I'},{"CAA",'Q'},{"CAC",'H'},{"CAG",'Q'},{"CAR",'Q'},{"CAT",'H'},{"CAY",'H'},{"CCA",'P'},{"CCB",'P'},{"CCC",'P'},{"CCD",'P'},{"CCG",'P'},{"CCH",'P'},{"CCK",'P'},{"CCM",'P'},{"CCN",'P'},{"CCR",'P'},{"CCS",'P'},{"CCT",'P'},{"CCV",'P'},{"CCW",'P'},{"CCY",'P'},{"CGA",'R'},{"CGB",'R'},{"CGC",'R'},{"CGD",'R'},{"CGG",'R'},{"CGH",'R'},{"CGK",'R'},{"CGM",'R'},{"CGN",'R'},{"CGR",'R'},{"CGS",'R'},{"CGT",'R'},{"CGV",'R'},{"CGW",'R'},{"CGY",'R'},{"CTA",'L'},{"CTB",'L'},{"CTC",'L'},{"CTD",'L'},{"CTG",'L'},{"CTH",'L'},{"CTK",'L'},{"CTM",'L'},{"CTN",'L'},{"CTR",'L'},{"CTS",'L'},{"CTT",'L'},{"CTV",'L'},{"CTW",'L'},{"CTY",'L'},{"GAA",'E'},{"GAC",'D'},{"GAG",'E'},{"GAR",'E'},{"GAT",'D'},{"GAY",'D'},{"GCA",'A'},{"GCB",'A'},{"GCC",'A'},{"GCD",'A'},{"GCG",'A'},{"GCH",'A'},{"GCK",'A'},{"GCM",'A'},{"GCN",'A'},{"GCR",'A'},{"GCS",'A'},{"GCT",'A'},{"GCV",'A'},{"GCW",'A'},{"GCY",'A'},{"GGA",'G'},{"GGB",'G'},{"GGC",'G'},{"GGD",'G'},{"GGG",'G'},{"GGH",'G'},{"GGK",'G'},{"GGM",'G'},{"GGN",'G'},{"GGR",'G'},{"GGS",'G'},{"GGT",'G'},{"GGV",'G'},{"GGW",'G'},{"GGY",'G'},{"GTA",'V'},{"GTB",'V'},{"GTC",'V'},{"GTD",'V'},{"GTG",'V'},{"GTH",'V'},{"GTK",'V'},{"GTM",'V'},{"GTN",'V'},{"GTR",'V'},{"GTS",'V'},{"GTT",'V'},{"GTV",'V'},{"GTW",'V'},{"GTY",'V'},{"MGA",'R'},{"MGG",'R'},{"MGR",'R'},{"NNN",'X'},{"RAY",'B'},{"SAR",'Z'},{"TAA",'.'},{"TAC",'Y'},{"TAG",'.'},{"TAR",'.'},{"TAT",'Y'},{"TAY",'Y'},{"TCA",'S'},{"TCB",'S'},{"TCC",'S'},{"TCD",'S'},{"TCG",'S'},{"TCH",'S'},{"TCK",'S'},{"TCM",'S'},{"TCN",'S'},{"TCR",'S'},{"TCS",'S'},{"TCT",'S'},{"TCV",'S'},{"TCW",'S'},{"TCY",'S'},{"TGA",'.'},{"TGC",'C'},{"TGG",'W'},{"TGT",'C'},{"TGY",'C'},{"TRA",'.'},{"TTA",'L'},{"TTC",'F'},{"TTG",'L'},{"TTR",'L'},{"TTT",'F'},{"TTY",'F'},{"XXX",'X'},{"YTA",'L'},{"YTG",'L'},{"YTR",'L'}};
 
-inline std::string translate(std::string& nts,uint start_pos=0,int end_pos=0) {
-    end_pos = end_pos==0 ? nts.size() : end_pos;
-
-#ifdef DEBUG
-    if(((end_pos+1)-start_pos)%3!=0){
-        std::cerr<<"cannot translate sequence of length%3!=0"<<std::endl;
-        exit(-1);
-    }
-    if(nts.size()==0 || (end_pos+1)-start_pos==0){
-        std::cerr<<"cannot translate empty sequence"<<std::endl;
-        exit(-1);
-    }
-    assert(end_pos+1<=nts.size());
-#endif
-
-    std::string res;
-    std::string cur_nts;
-    for(int i=start_pos;i+2<=end_pos;i+=3) {
-        for(auto& nt : nts.substr(i,3)){
-            cur_nts+=toupper(nt);
-        }
-        res+=codon_map[cur_nts];
-        cur_nts.clear();
-    }
-    return res;
-}
-
 inline bool file_exists(std::string& fname){
     std::ifstream if_ss;
     if_ss.open(fname);
@@ -318,6 +291,7 @@ public:
     SEQ()=default;
     SEQ(std::string& exon_nt_seq){
         this->exon_nt = exon_nt_seq;
+        transform(this->exon_nt.begin(), this->exon_nt.end(), this->exon_nt.begin(), ::toupper);
     }
 
     void set_cds(uint start_pos,uint end_pos){
@@ -419,7 +393,6 @@ public:
     uint find_inframe_codon(char c,char stop_c,std::vector<uint>& positions, uint start_idx, bool forward, bool first=false){
         positions.clear();
         std::string cur_codon;
-        std::string cur_aa;
 
         uint i=start_idx;
         char cur_c;
@@ -469,6 +442,28 @@ private:
     // farthest plausible coordinates for the cds start and stop in the same frame as the main cds segment set for the sequence
     uint min_cds_start=0;
     uint max_cds_end=0;
+
+    inline std::string translate(std::string& nts,uint start_pos=0,int end_pos=0) {
+        end_pos = end_pos==0 ? nts.size() : end_pos;
+
+#ifdef DEBUG
+        if(((end_pos+1)-start_pos)%3!=0){
+            std::cerr<<"cannot translate sequence of length%3!=0"<<std::endl;
+            exit(-1);
+        }
+        if(nts.size()==0 || (end_pos+1)-start_pos==0){
+            std::cerr<<"cannot translate empty sequence"<<std::endl;
+            exit(-1);
+        }
+        assert(end_pos+1<=nts.size());
+#endif
+
+        std::string res;
+        for(int i=start_pos;i+2<=end_pos;i+=3) {
+            res+=codon_map[nts.substr(i,3)];
+        }
+        return res;
+    }
 };
 
 #endif
