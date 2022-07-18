@@ -332,35 +332,34 @@ void TX::extend_to_start(TX* ref_tx){ // extends to start while comparing to the
     this->cds.intersection(ref_tx->cds,intersected_chain);
 
     uint best_start_idx = genomic_starts.size()-1;
-    uint next_start_idx = 0;
     // iterate over them - check phase in both - continue
-    bool found_inframe = false;
-    for(auto& c : intersected_chain){ // get phase at position for 1
+    auto get_best_start = [&best_start_idx, &transcriptomic_starts, &ref_tx, this](SEGTP &c) {
+        // as soon as we find the first valid (with added inframe) - save and terminate
         // transcriptomic positions with respect to q and t
-        uint t_tpos = ref_tx->cds.genome2nt(c.get_start(),this->strand);
-        uint q_tpos = this->cds.genome2nt(c.get_start(),this->strand);
+        uint t_tpos = ref_tx->cds.genome2nt(c.get_start(this->strand),this->strand);
+        uint q_tpos = this->cds.genome2nt(c.get_start(this->strand),this->strand);
 
-//        if(c.contains(genomic_starts[next_start_idx])){
-//            next_start_idx++;
-//        }
-        for(int n=next_start_idx;n<transcriptomic_starts.size()-1;n++){
-            if(transcriptomic_starts[n] > q_tpos){
-                next_start_idx++;
+        for(int n=best_start_idx;n>=0;n--){
+            if(transcriptomic_starts[n] <= q_tpos){
+                best_start_idx = n;
             }
             else{
                 break;
             }
         }
-        if((t_tpos%3)==(q_tpos%3)){
-            best_start_idx = next_start_idx;
+        if((t_tpos%3)==(q_tpos%3)){ // found first occurrence of inframe
+            return true;
         }
-        if(next_start_idx==genomic_starts.size()-1){
-            break;
-        }
+        return false;
+    };
+    if (this->strand == '+') {
+        std::find_if(intersected_chain.begin(), intersected_chain.end(), get_best_start);
+    } else {
+        std::find_if(intersected_chain.rbegin(), intersected_chain.rend(), get_best_start);
     }
 
 #ifdef DEBUG
-    assert(best_start_idx<=transcriptomic_starts.size()-1);
+    assert(best_start_idx<=transcriptomic_starts.size()-1 && best_start_idx>=0);
 #endif
 
     // 4. cut to length

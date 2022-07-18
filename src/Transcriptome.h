@@ -71,7 +71,9 @@ public:
 
     bool contains(uint pos) const {return pos>=this->start && pos<=this->end;}
     uint32_t get_start() const {return this->start;}
+    uint32_t get_start(bool strand){return strand=='+'?this->start:this->end;}
     uint32_t get_end() const {return this->end;}
+    uint32_t get_end(bool strand){return strand=='+'?this->end:this->start       ;}
     uint32_t get_phase() const {return this->phase;}
     uint32_t get_phase(uint pos, char strand) const {
 #ifdef DEBUG

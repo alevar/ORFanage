@@ -178,7 +178,7 @@ int run(){
                     // TODO: does it work without sequence avaialble?
 
 #ifdef DEBUG
-                    if(std::strcmp(q->get_tid().c_str(),"rna-XM_024452071.1")==0){ // rna-XM_011520617.2
+                    if(std::strcmp(q->get_tid().c_str(),"rna-XM_017030033.1")==0){ // rna-XM_011520617.2
                         std::cout<<"found"<<std::endl;
                     }
 #endif
