@@ -360,7 +360,7 @@ public:
         this->max_cds_end=0;
     }
     bool trim_to_stop(){
-        size_t stop_aa_pos = this->aa.rfind('.');
+        size_t stop_aa_pos = this->aa.find('.');
         if(stop_aa_pos!=std::string::npos){ // stop codon was found
             size_t stop_nt_pos = stop_aa_pos*3;
             this->cds_end = this->cds_start+stop_nt_pos-1;
@@ -390,7 +390,7 @@ public:
         return false;
     }
     // find all instances of a codon within the same frame and saves it into a list. the positions in the list are with respect to the nucleotide sequence
-    uint find_inframe_codon(char c,char stop_c,std::vector<uint>& positions, uint start_idx, bool forward, bool first=false){
+    uint find_inframe_codon(char c,char stop_c,std::vector<uint>& positions, uint start_idx,uint stop_idx, bool forward, bool first){
         positions.clear();
         std::string cur_codon;
 
@@ -410,6 +410,10 @@ public:
                 if(first){ // if true - only report the first occurrence
                     break;
                 }
+            }
+            bool terminate = forward ? i>stop_idx : i<stop_idx;
+            if(terminate){
+                break;
             }
 
             i = forward ? i+3 : i-3;

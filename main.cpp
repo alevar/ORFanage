@@ -82,6 +82,7 @@ struct Parameters{
     float ppp_minscore = 0.0;
 
     bool use_id = false; // if enabled will use query gene ids to form bundles. the same reference id may be evaluated in multiple bundles if overlaps queries with different gene ids
+    bool non_aug = false; // If enabled, non-AUG start codons in reference transcripts will not be discarded and will be considered in overlapping query transcripts on equal grounds with the AUG start codon.
 
 } global_params;
 
@@ -99,6 +100,9 @@ int run(){
     Transcriptome transcriptome;
     if(!global_params.reference_fasta_fname.empty()){
         transcriptome.set_ref(global_params.reference_fasta_fname);
+    }
+    if(global_params.non_aug){
+        transcriptome.use_non_aug();
     }
     if(global_params.percent_ident>-1){
         assert(!global_params.reference_fasta_fname.empty());
@@ -178,7 +182,7 @@ int run(){
                     // TODO: does it work without sequence avaialble?
 
 #ifdef DEBUG
-                    if(std::strcmp(q->get_tid().c_str(),"rna-XM_017030033.1")==0){ // rna-XM_011520617.2
+                    if(std::strcmp(q->get_tid().c_str(),"rna-NM_001171940.2")==0){ // rna-XM_011520617.2
                         std::cout<<"found"<<std::endl;
                     }
 #endif
@@ -206,11 +210,12 @@ int run(){
                         }
                         qseg.load_seq();
 
-                        int ret = qseg.rescue_cds(t);
+                        int ret = qseg.rescue_cds(global_params.non_aug,t);
                         if(!ret){continue;}
 
-                        if(qseg.get_aa().front()!='M' ||
-                           qseg.get_aa().back()!='.'){
+                        if(qseg.get_aa().back()!='.' ||
+                           (!global_params.non_aug && qseg.get_aa().front()!='M') ||
+                                (global_params.non_aug && qseg.get_aa().front()!='M' && !(qseg.get_strand()=='+' ? qseg.get_cds_start()==t->get_cds_start() : qseg.get_cds_end()==t->get_cds_end()))){
                             qseg.remove_cds();
                             continue;
                         }
@@ -443,8 +448,9 @@ int main(int argc, char** argv) {
     args.add_option("stats",ArgParse::Type::STRING,"Output a separate file with stats for each query/template pair",ArgParse::Level::GENERAL,false);
     args.add_option("nc",ArgParse::Type::FLAG,"Write transcripts which do not have CDS as well",ArgParse::Level::GENERAL,false);
     args.add_option("threads",ArgParse::Type::INT,"Number of threads to run in parallel",ArgParse::Level::GENERAL,false);
-    args.add_option("use_id",ArgParse::Type::BOOL,"If enabled, only transcripts with the same gene ID from the query file will be used to form a bundle. In this mode the same template transcript may be used in several bundles, if overlaps transcripts with different gene_ids.",ArgParse::Level::GENERAL,false);
-    
+    args.add_option("use_id",ArgParse::Type::FLAG,"If enabled, only transcripts with the same gene ID from the query file will be used to form a bundle. In this mode the same template transcript may be used in several bundles, if overlaps transcripts with different gene_ids.",ArgParse::Level::GENERAL,false);
+    args.add_option("non_aug",ArgParse::Type::FLAG,"If enabled, non-AUG start codons in reference transcripts will not be discarded and will be considered in overlapping query transcripts on equal grounds with the AUG start codon.",ArgParse::Level::GENERAL,false);
+
     // Alignment
     args.add_option("pi",ArgParse::Type::INT,"Percent identity between the query and template sequences. This option requires --reference parameter to be set. If enabled - will run alignment between passing pairs.", ArgParse::Level::GENERAL,false);
     args.add_option("gapo",ArgParse::Type::INT,"Gap-open penalty", ArgParse::Level::GENERAL,false);
@@ -611,6 +617,10 @@ int main(int argc, char** argv) {
 
     if(args.is_set("use_id")){
         global_params.use_id = true;
+    }
+
+    if(args.is_set("non_aug")){
+        global_params.non_aug = true;
     }
 
     global_params.output_fname = args.get_string("output");

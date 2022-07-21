@@ -257,7 +257,7 @@ void TX::extend_to_stop(){ // searches downstream of the CDS for the next stop c
         return;
     }
     std::vector<uint> stops;
-    uint res = this->seq.find_inframe_codon('.',';',stops,this->seq.get_cds_end()+1,true,true);
+    uint res = this->seq.find_inframe_codon('.',';',stops,this->seq.get_cds_end()+1,this->seq.get_exon_len(),true,true);
     if(res!=0){ // stop is found - adjust accordingly
         int chain_extension_len = (stops[0]+2)-this->seq.get_cds_end();
         this->seq.extend_to_pos(stops[0]+2);
@@ -275,7 +275,7 @@ void TX::extend_to_start(int new_start){ // searches upstream for the available 
             return;
         }
         std::vector<uint> starts;
-        uint res = this->seq.find_inframe_codon('M','.',starts,this->seq.get_cds_start(),false,true);
+        uint res = this->seq.find_inframe_codon('M','.',starts,this->seq.get_cds_start(),0,false,true);
         if(res==0){
             return;
         }
@@ -291,15 +291,34 @@ void TX::extend_to_start(int new_start){ // searches upstream for the available 
     return;
 }
 // this version of the extension function will search for the start codon which maximizes the similarity to the original template ORF
-void TX::extend_to_start(TX* ref_tx){ // extends to start while comparing to the closest reference
+void TX::extend_to_start(TX* ref_tx,bool allow_non_aug){ // extends to start while comparing to the closest reference
     // can skip the ckeck if the start coordinate is the same as the reference and is M
     char start_codon = this->get_codon_aa(0);
     bool match_start = this->strand=='+' ? this->get_cds_start()==ref_tx->get_cds_start() : this->get_cds_end()==ref_tx->get_cds_end();
-    if(start_codon=='M' && match_start){return;}
+    if((start_codon=='M' || allow_non_aug) && match_start){return;}
+
+    // check non-aug
+    if(allow_non_aug){
+        // check if reference start matching is possible (much faster) - if yes - use that, otherwise proceed evaluating other possibilities
+        int ref_cds_start = this->strand=='+' ? ref_tx->get_cds_start() : ref_tx->get_cds_end();
+        int this_cds_start = this->strand=='+' ? this->get_cds_start() : this->get_cds_end();
+        int ref_start_in_this = this->exons.genome2nt(ref_cds_start,this->strand);
+        int q_start_in_this = this->exons.genome2nt(this_cds_start,this->strand);
+
+        if(ref_start_in_this >=0 && ref_start_in_this%3==q_start_in_this%3){ // found start - can extend and exit
+            // need to make sure no stop codons are being introduced in the process
+            std::vector<uint> stops;
+            uint res = this->seq.find_inframe_codon('.',';',stops,this->seq.get_cds_start(),ref_start_in_this,false,true);
+            if(res==0){
+                extend_to_start(ref_start_in_this);
+                return;
+            }
+        }
+    }
 
     // otherwise - search for the best start codon
     std::vector<uint> transcriptomic_starts;
-    uint res = this->seq.find_inframe_codon('M','.',transcriptomic_starts,this->seq.get_cds_start(),false,false);
+    uint res = this->seq.find_inframe_codon('M','.',transcriptomic_starts,this->seq.get_cds_start(),0,false,false);
     if(res==0){return;}
 
     int max_chain_extension_len = this->seq.get_cds_start()-transcriptomic_starts.back();
@@ -389,7 +408,7 @@ uint TX::inframe_len(TX* t){ // it doesn't matter that we do this stranded - eit
     }
     return res;
 }
-int TX::rescue_cds(TX* t){
+int TX::rescue_cds(bool allow_non_aug,TX* t){
     if(this->seq.cds_nt_len()<3){
         this->remove_cds();
         return 0;
@@ -401,25 +420,21 @@ int TX::rescue_cds(TX* t){
         return 0;
     }
     extend_to_stop();
-    extend_to_start(t);
-    adjust_start();
-    this->set_cds_phase(0);
-    return 1;
-}
-int TX::rescue_cds(){
-    if(this->seq.cds_nt_len()<3){
-        this->remove_cds();
-        return 0;
+    if(t == nullptr){
+        if(!allow_non_aug){
+            extend_to_start();
+        }
     }
-
-    adjust_stop();
-    if(this->cds_len()==0){
-        this->remove_cds();
-        return 0;
+    else{
+        extend_to_start(t,allow_non_aug);
     }
-    extend_to_stop(); // TODO: stop re-iterating over the chains. set the last coordinate if available (optional argument)
-    extend_to_start();
-    adjust_start();
+    bool run_adjust_start = true;
+    if(allow_non_aug && t!= nullptr){
+        run_adjust_start = !(this->strand=='+' ? this->cds_start==t->get_cds_start() : this->cds_end==t->get_cds_end());
+    }
+    if(run_adjust_start){
+        adjust_start();
+    }
     this->set_cds_phase(0);
     return 1;
 }
@@ -579,6 +594,9 @@ void Transcriptome::set_ref(const std::string& rff){
     this->ref_fa_fname = rff;
     this->check_ref = true;
     gfasta.init(rff.c_str());
+}
+void Transcriptome::use_non_aug(){
+    this->allow_non_aug=true;
 }
 void Transcriptome::set_aligner(const int8_t *mat, const int8_t *alphabet, int gapo, int gape){
     this->aligner = Finder(mat,alphabet,gapo,gape);
@@ -769,11 +787,11 @@ uint Transcriptome::clean_cds(bool rescue){
             if(this->check_ref){
                 if(rescue){
                     tx->load_seq();
-                    tx->rescue_cds();
+                    tx->rescue_cds(this->allow_non_aug); // TODO: allow non aug - needs to allow storage of non-aug transcripts (only perform cleaning based on stop codons) and no start extension. And needs to handle querrying appropriately
                 }
                 char start_codon = tx->get_codon_aa(0);
                 char stop_codon = tx->get_codon_aa(tx->aa_len()-1);
-                if(start_codon!='M' || stop_codon!='.'){
+                if((start_codon!='M' && !this->allow_non_aug) || stop_codon!='.'){
                     res++;
                     continue;
                 }

@@ -376,12 +376,9 @@ public:
             }
             chain_pos+=c.slen();
         }
-#ifdef DEBUG
         if(!found_pos){
-            std::cerr<<"unexpected chain_pos<0"<<std::endl;
-            exit(-1);
+            return -1;
         }
-#endif
         return strand=='+' ? chain_pos : (this->clen()-chain_pos)-1;
     }
     int nt2genome(int zero_pos,char strand){ // tells which coordinate on the chain corresponds to the coordinate on the nt
@@ -664,9 +661,8 @@ public:
     void extend_to_stop(); // searches downstream of the CDS for the next stop codon in the same frame
     void extend_to_start(int new_start=-1);
     uint inframe_len(TX* t);
-    void extend_to_start(TX* t);
-    int rescue_cds();
-    int rescue_cds(TX* t);
+    void extend_to_start(TX* t,bool allow_non_aug=false);
+    int rescue_cds(bool allow_non_aug=false,TX* t=nullptr);
     void load_seq();
     bool seq_loaded(){return !this->seq.empty();}
     uint aa_len(){return this->seq.empty() ? this->cds_alen() : this->seq.cds_aa_len();}
@@ -754,7 +750,7 @@ public:
               << this->get_strand() << "\t"
               << "." << "\t"
               << "transcript_id \""+this->get_tid()+"\"; "
-              << this->get_attributes() << "\t"
+              << this->get_attributes()
               << std::endl;
 
         auto e_it = this->exons.cbegin();
@@ -767,7 +763,7 @@ public:
                << "." << "\t"
                << this->get_strand() << "\t"
                << "." << "\t"
-               << "transcript_id \""+this->get_tid()+"\"; "
+               << "transcript_id \""+this->get_tid()+"\";"
                << std::endl;
             ++e_it;
         }
@@ -782,7 +778,7 @@ public:
                    << "." << "\t"
                    << this->get_strand() << "\t"
                    << c_it->get_phase() << "\t"
-                   << "transcript_id \""+this->get_tid()+"\"; "
+                   << "transcript_id \""+this->get_tid()+"\";"
                    << std::endl;
                 ++c_it;
             }
@@ -902,6 +898,7 @@ public:
     ~Transcriptome()=default;
 
     void set_ref(const std::string& rff);
+    void use_non_aug();
     void load_seqids(GffReader& gffReader);
     void set_ppp(std::string& track_name,std::string mode, int mincodons, float minscore){this->ppp_track_fname=track_name;this->ppp_mode=mode;this->ppp_mincodons=mincodons;this->ppp_minscore=minscore;}
     void load_ppptracks();
@@ -974,6 +971,8 @@ private:
 
     // Alignment
     Finder aligner;
+
+    bool allow_non_aug = false;
 };
 
 class CompMat{

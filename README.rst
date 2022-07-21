@@ -2,12 +2,12 @@ ORFanage: Ultra-efficient and sensitive method to search for ORFs in spliced gen
 ================================================================================================
 
 .. image:: https://img.shields.io/badge/License-GPLv3-blue.svg
-:target: https://opensource.org/licenses/GPL-3.0
-:alt: GPLv3 License
+    :target: https://opensource.org/licenses/GPL-3.0
+    :alt: GPLv3 License
 
 .. contents::
-:local:
-:depth: 2
+    :local:
+    :depth: 2
 
 Introduction
 ^^^^^^^^^^^^
