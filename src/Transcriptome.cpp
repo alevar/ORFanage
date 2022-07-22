@@ -549,15 +549,18 @@ bool Bundle::can_add(TX* t,bool use_id) const{
         return false;
     }
 }
-bool Bundle::add_tx(TX* t){
+bool Bundle::add_tx(TX* t,bool use_id){
+#ifdef DEBUG
     if(!this->can_add(t)){
         return false;
     }
+#endif
     this->txs.push_back(t);
     this->seqid = t->get_seqid();
     this->strand = t->get_strand();
     this->bstart = std::min(this->bstart,t->get_start());
     this->bend = std::max(this->bend,t->get_end());
+    this->gid = use_id ? t->get_geneID() : "";
 //    t->set_bundle_ref(this);
     return true;
 }
@@ -723,10 +726,10 @@ uint Transcriptome::bundleup(bool use_id){ // create bundles and return the tota
                 this->bundles.back().load_seq(seqid_seq);
             }
             this->bundles.push_back(Bundle());
-            this->bundles.back().add_tx(&t);
+            this->bundles.back().add_tx(&t,use_id);
         }
         else{
-            this->bundles.back().add_tx(&t);
+            this->bundles.back().add_tx(&t,use_id);
         }
     }
     if(this->check_ref){

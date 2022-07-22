@@ -58,7 +58,6 @@ struct Parameters{
     int cds_minlen = -1; // minimum length
     find_mode_t mode = LONGEST_MATCH;
     int num_threads = 1;
-    bool write_all = false; // whether to output all transcripts regardless of whether CDS was found or not
 
     // Alignment
     int percent_ident = -1; // percent identity
@@ -83,6 +82,7 @@ struct Parameters{
 
     bool use_id = false; // if enabled will use query gene ids to form bundles. the same reference id may be evaluated in multiple bundles if overlaps queries with different gene ids
     bool non_aug = false; // If enabled, non-AUG start codons in reference transcripts will not be discarded and will be considered in overlapping query transcripts on equal grounds with the AUG start codon.
+    bool keep_cds = false; // If enabled, any CDS already presernt in the query will be kept unmodified
 
 } global_params;
 
@@ -153,32 +153,92 @@ int run(){
     #pragma omp parallel for
 #endif
     for(auto bundle_it=transcriptome.bbegin(); bundle_it!=transcriptome.bend(); bundle_it++){ // iterate over bundles
-        if(!bundle_it->has_template() || !bundle_it->has_query()){
-            continue;
-        }
-        Scores scs;
+
+        std::vector<std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>> stats; // segment,query,template,score,notes
         TX *q,*t;
         Finder* fndr = global_params.percent_ident>-1 ? transcriptome.get_aligner() : nullptr;
         CHAIN segments;
 
+        if(!bundle_it->has_template() || !bundle_it->has_query()){
+            // todo: still need to output into the gtf and stats
+            if(global_params.stats_fp.is_open()){
+                for(int qi=0;qi<bundle_it->size();qi++) {
+                    q = bundle_it->operator[](qi);
+                    if(q->is_template()){continue;}
+                    std::string cur_seqid;
+                    transcriptome.seqid2name(q->get_seqid(),cur_seqid);
+                    global_params.out_gtf_fp<<q->str(cur_seqid)<<std::endl;
+                    global_params.stats_fp << q->get_tid() << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << std::endl;
+                }
+            }
+            continue;
+        }
+
         for(int qi=0;qi<bundle_it->size();qi++){
-            scs.clear();
+            stats.clear();
             q=bundle_it->operator[](qi);
             if(q->is_template()){continue;}
+            if(global_params.keep_cds && q->has_cds()){
+                q->build_cds();
+                std::string cur_seqid;
+                transcriptome.seqid2name(q->get_seqid(),cur_seqid);
+                global_params.out_gtf_fp<<q->str(cur_seqid)<<std::endl;
+                global_params.stats_fp << q->get_tid() << "\t"
+                                       << "-" << "\t"
+                                       << "-" << "\t"
+                                       << "keep_cds" << "\t"
+                                       << "-" << "\t"
+                                       << "-" << "\t"
+                                       << "-" << "\t"
+                                       << "-" << "\t"
+                                       << "-" << "\t"
+                                       << "-" << "\t"
+                                       << "-" << "\t"
+                                       << "-" << "\t"
+                                       << "-" << "\t"
+                                       << "-" << "\t"
+                                       << "-" << "\t"
+                                       << "-" << "\t"
+                                       << "-" << "\t"
+                                       << "-" << std::endl;
+                continue;
+            }
             q->remove_cds();
 
             for(int ti=0;ti<bundle_it->size();ti++){
                 t=bundle_it->operator[](ti);
                 if(!t->is_template()){continue;}
                 int intlen = q->exon_chain()->intersection(*t->cds_chain(),segments,true);
-                if(intlen==0){continue;}
-                scs.emplace_back(std::vector<std::pair<TX,Score>>{});
+                stats.emplace_back(std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>{});
+                if(intlen==0){
+                    stats.back().emplace_back(std::make_tuple(SEGTP(),*q,*t,Score(),"no-overlap")); // empty score
+                    std::get<3>(stats.back().back()).pass = false;
+                    continue;
+                }
 
                 std::unordered_set<int> orf_starts;
                 std::pair<std::unordered_set<int>::iterator,bool> os_rit;
 
                 // now we need to reconstruct a transcript within the query exon chain for each segment of the template ORF
                 for(auto& s : segments){
+                    stats.back().emplace_back(std::make_tuple(s,*q,*t,Score(),"-"));
                     // TODO: does it work without sequence avaialble?
 
 #ifdef DEBUG
@@ -191,31 +251,60 @@ int run(){
 #ifdef DEBUG
                     assert(seg_phase>=0 && seg_phase<3);
 #endif
-                    if(s.slen()<3){continue;}
+                    if(s.slen()<3){
+                        std::get<4>(stats.back().back())="segment_len<3";
+                        std::get<3>(stats.back().back()).pass = false;
+                        continue;
+                    }
                     s.set_phase(seg_phase);
                     TX qseg = *q;
                     qseg.set_cds_start(s.get_start());
                     qseg.set_cds_end(s.get_end());
                     qseg.set_cds_phase(s.get_phase());
                     qseg.build_cds();
-                    if(qseg.cds_len()<3){continue;}
+                    if(qseg.cds_len()<3){
+                        std::get<1>(stats.back().back())=qseg;
+                        std::get<4>(stats.back().back())="cds_len<3";
+                        std::get<3>(stats.back().back()).pass = false;
+                        continue;
+                    }
                     qseg.correct_chain_len();
-                    if(qseg.cds_len()<3){continue;}
+                    if(qseg.cds_len()<3){
+                        std::get<1>(stats.back().back())=qseg;
+                        std::get<4>(stats.back().back())="cds_len<3";
+                        std::get<3>(stats.back().back()).pass = false;
+                        continue;
+                    }
 
                     // if reference is provided
                     if(!global_params.reference_fasta_fname.empty()) {
                         if(qseg.cds_len()<3){
+                            std::get<1>(stats.back().back())=qseg;
+                            std::get<4>(stats.back().back())="cds_len<3";
+                            std::get<3>(stats.back().back()).pass = false;
                             qseg.remove_cds();
                             continue;
                         }
                         qseg.load_seq();
 
                         int ret = qseg.rescue_cds(global_params.non_aug,t);
-                        if(!ret){continue;}
+                        std::get<1>(stats.back().back())=qseg;
+                        if(!ret){
+                            std::get<4>(stats.back().back())="not_rescued";
+                            std::get<3>(stats.back().back()).pass = false;
+                            continue;
+                        }
 
                         if(qseg.get_aa().back()!='.' ||
                            (!global_params.non_aug && qseg.get_aa().front()!='M') ||
                                 (global_params.non_aug && qseg.get_aa().front()!='M' && !(qseg.get_strand()=='+' ? qseg.get_cds_start()==t->get_cds_start() : qseg.get_cds_end()==t->get_cds_end()))){
+                            std::get<3>(stats.back().back()).pass = false;
+                            if(qseg.get_aa().back()!='.'){
+                                std::get<4>(stats.back().back())="missing_stop";
+                            }
+                            else{
+                                std::get<4>(stats.back().back())="missing_start";
+                            }
                             qseg.remove_cds();
                             continue;
                         }
@@ -225,27 +314,35 @@ int run(){
                     assert(qseg.get_aa().find(".")==qseg.get_aa().size()-1); // assert that no premature stop-codons are found
 #endif
 
-                    if(qseg.cds_chain()->clen()<global_params.cds_minlen){continue;}
+                    if(qseg.cds_chain()->clen()<global_params.cds_minlen){
+                        std::get<4>(stats.back().back())="minlen";
+                        std::get<3>(stats.back().back()).pass = false;
+                        continue;
+                    }
 
                     Score qseg_score = qseg.score(*t);
+                    std::get<3>(stats.back().back())=qseg_score;
                     if(qseg_score.lpd<global_params.len_perc_diff ||
                        qseg_score.ilpd<global_params.len_frame_perc_diff ||
                        qseg_score.mlpd<global_params.len_match_perc_diff){
+                        std::get<3>(stats.back().back()).pass = false;
                         continue;
                     }
 
                     os_rit = orf_starts.insert(qseg.get_cds_start());
                     if(!os_rit.second){ // the ORF previously existed
+                        std::get<4>(stats.back().back())="dup";
+                        std::get<3>(stats.back().back()).pass = false;
                         continue;
                     }
 
                     // otherwise - we can safely add to the curent evaluation
                     qseg.store_template(t);
-                    scs.back().emplace_back(std::make_pair(qseg,qseg_score));
+                    std::get<1>(stats.back().back())=qseg;
                 }
 #ifdef DEBUG
                 // can we select a single segment to proceed with at this point?
-                if(scs.back().size()>1){
+                if(stats.back().size()>1){ // TODO: superflous since we are keeping track of all segments - even duplicates here...
                     std::cerr<<"found more than one valid segment"<<std::endl;
                 }
 #endif
@@ -254,22 +351,22 @@ int run(){
 
             // check percent identity if requested
             if(global_params.percent_ident>-1) {
-                for(auto& sc : scs){
+                for(auto& sc : stats){
                     for(auto& seg : sc){
-                        if(!seg.second.pass){continue;}
+                        if(!std::get<3>(seg).pass){continue;}
 
-                        if (!seg.first.get_template()->seq_loaded()) {seg.first.get_template()->load_seq();} // only load sequence if not previously loaded
+                        if (!std::get<1>(seg).get_template()->seq_loaded()) {std::get<1>(seg).get_template()->load_seq();} // only load sequence if not previously loaded
                         ksw_extz_t ez;
-                        fndr->align(seg.first.get_template()->get_aa().c_str(), seg.first.get_aa().c_str(), ez);
+                        fndr->align(std::get<1>(seg).get_template()->get_aa().c_str(), std::get<1>(seg).get_aa().c_str(), ez);
                         if (ez.n_cigar == 0) {
-                            seg.second.pass =false;
+                            std::get<3>(seg).pass =false;
                         }
                         else{
-                            int ret = fndr->parse(ez, seg.first.get_aa(), seg.first.get_template()->get_aa(), seg.second);
-                            seg.second.aln_match = seg.second.num_aln_match();
-                            seg.second.aln_pi = seg.second.pi();
-                            if (ret < 0 || seg.second.aln_pi < global_params.percent_ident) {
-                                seg.second.pass = false;
+                            int ret = fndr->parse(ez, std::get<1>(seg).get_aa(), std::get<1>(seg).get_template()->get_aa(), std::get<3>(seg));
+                            std::get<3>(seg).aln_match = std::get<3>(seg).num_aln_match();
+                            std::get<3>(seg).aln_pi = std::get<3>(seg).pi();
+                            if (ret < 0 || std::get<3>(seg).aln_pi < global_params.percent_ident) {
+                                std::get<3>(seg).pass = false;
                             }
                         }
                         free(ez.cigar);
@@ -284,7 +381,7 @@ int run(){
             //   We only need to run if no good/suitable orfanage result is available
             //   if phylocsf is requested - compute for the current qseg and add all to the current list for evaluation
             if(!global_params.ppp_track_fname.empty()){
-                if(global_params.ppp_mode==LONGEST || global_params.ppp_mode==BEST){
+                if(global_params.ppp_mode==LONGEST || global_params.ppp_mode==BEST){ // todo: add to the stats
                     std::pair<SEGTP,float> ppp_chain = transcriptome.compute_tx_cds_ppp(*q);
 
                     TX qseg = *q;
@@ -296,33 +393,33 @@ int run(){
                     if(qseg.cds_chain()->clen()<global_params.cds_minlen){continue;}
 
                     Score qseg_score = qseg.score(*t);
+                    qseg_score.ppp_score = std::get<1>(ppp_chain);
+                    stats.back().emplace_back(std::make_tuple(std::get<0>(ppp_chain),qseg,*t,qseg_score,"ppp"));
                     if(qseg_score.lpd<global_params.len_perc_diff ||
                        qseg_score.ilpd<global_params.len_frame_perc_diff ||
                        qseg_score.mlpd<global_params.len_match_perc_diff){
+                        std::get<3>(stats.back().back()).pass = false;
                         continue;
                     }
-                    // otherwise - we can safely add to the curent evaluation
-                    qseg_score.ppp_score = std::get<1>(ppp_chain);
-                    scs.back().emplace_back(std::make_pair(qseg,qseg_score));
                 }
                 else if(global_params.ppp_mode==VALIDATE){ // only perform validation of novel transcripts
                     const uint64_t chr_len = transcriptome.get_chrom_len(q->get_seqid());
                     std::array<std::vector<std::vector<float> >, 4> extracted_scores; // phase 0, phase 1, phase 2, power
                     transcriptome.compute_PhyloCSF_for_transcript(*q, extracted_scores);(*q, extracted_scores);
 
-                    for(auto& sc : scs){
+                    for(auto& sc : stats){
                         for(auto& seg : sc){
-                            if(!seg.second.pass){continue;}
+                            if(!std::get<3>(seg).pass){continue;}
 
                             bool ppp_pass = true;
-                            std::tuple<float, float> ppp_scores = transcriptome.compute_PhyloCSF(seg.first, extracted_scores,q->get_strand()=='+'?0:chr_len);
-                            seg.second.ppp_score = std::get<0>(ppp_scores);
+                            std::tuple<float, float> ppp_scores = transcriptome.compute_PhyloCSF(std::get<1>(seg), extracted_scores,q->get_strand()=='+'?0:chr_len);
+                            std::get<3>(seg).ppp_score = std::get<0>(ppp_scores);
                             if(std::get<0>(ppp_scores) < global_params.ppp_minscore){
                                 ppp_pass = false;
                             }
 
                             if (!ppp_pass) {
-                                seg.second.pass=false;
+                                std::get<3>(seg).pass=false;
                             } // remove
                         }
                     }
@@ -341,57 +438,49 @@ int run(){
             Score best_score;
 
             int tci = 0;
-            for(auto& t_sc : scs){
+            for(auto& t_sc : stats){
                 int sci = 0;
                 for(auto& seg : t_sc){
                     // write stats regardless of whether it is chosen or not
-#ifndef DEBUG
-#pragma omp critical
-#endif
-                    {
-                        global_params.stats_fp<<seg.first.get_tid()<<"\t"
-                                              <<seg.first.get_template()->get_tid()<<"\t"
-                                              <<seg.second<<std::endl;
-                    }
 
-                    if(seg.second.pass){
+                    if(std::get<3>(seg).pass){
                         // evaluate and pick the best choice based on a strategy
                         switch(global_params.mode){
                             case LONGEST: // pick the longest
-                                if(best_score.qlen<seg.second.qlen){
+                                if(best_score.qlen<std::get<3>(seg).qlen){
                                     template_comp_id = tci;
                                     segment_comp_id = sci;
-                                    best_score = seg.second;
+                                    best_score = std::get<3>(seg);
                                 }
                                 break;
                             case LONGEST_MATCH: //
-                                if(best_score.num_bp_inframe<seg.second.num_bp_inframe){
+                                if(best_score.num_bp_inframe<std::get<3>(seg).num_bp_inframe){
                                     template_comp_id = tci;
                                     segment_comp_id = sci;
-                                    best_score = seg.second;
+                                    best_score = std::get<3>(seg);
                                 }
                                 break;
                             case BEST: // PI if alignment enabled - otherwise ilpd
                                 if(global_params.percent_ident==-1){ // no alignment was being performed - use ilpd
-                                    if(best_score.ilpd<seg.second.ilpd){
+                                    if(best_score.ilpd<std::get<3>(seg).ilpd){
                                         template_comp_id = tci;
                                         segment_comp_id = sci;
-                                        best_score = seg.second;
+                                        best_score = std::get<3>(seg);
                                     }
                                 }
                                 else{
-                                    if(best_score.aln_pi==seg.second.aln_pi){ // pick the longest
-                                        if(best_score.qlen<seg.second.qlen){
+                                    if(best_score.aln_pi==std::get<3>(seg).aln_pi){ // pick the longest
+                                        if(best_score.qlen<std::get<3>(seg).qlen){
                                             template_comp_id = tci;
                                             segment_comp_id = sci;
-                                            best_score = seg.second;
+                                            best_score = std::get<3>(seg);
                                         }
                                     }
                                     else{
-                                        if(best_score.aln_pi<seg.second.aln_pi){
+                                        if(best_score.aln_pi<std::get<3>(seg).aln_pi){
                                             template_comp_id = tci;
                                             segment_comp_id = sci;
-                                            best_score = seg.second;
+                                            best_score = std::get<3>(seg);
                                         }
                                     }
                                 }
@@ -412,18 +501,54 @@ int run(){
 #endif
             {
                 if(template_comp_id>=0 && segment_comp_id>=0){ // found something
-                    scs[template_comp_id][segment_comp_id].first.add_attribute("orfanage_status","1");
-                    scs[template_comp_id][segment_comp_id].first.add_attribute("orfanage_template",scs[template_comp_id][segment_comp_id].first.get_template()->get_tid());
-                    global_params.out_gtf_fp<<scs[template_comp_id][segment_comp_id].first.str(cur_seqid)<<std::endl;
+                    std::get<1>(stats[template_comp_id][segment_comp_id]).add_attribute("orfanage_status","1");
+                    std::get<1>(stats[template_comp_id][segment_comp_id]).add_attribute("orfanage_template",std::get<1>(stats[template_comp_id][segment_comp_id]).get_template()->get_tid());
+                    global_params.out_gtf_fp<<std::get<1>(stats[template_comp_id][segment_comp_id]).str(cur_seqid)<<std::endl;
                 }
                 else{
-                    if(global_params.write_all){
-                        scs[template_comp_id][segment_comp_id].first.add_attribute("orfanage_status","0");
-                        global_params.out_gtf_fp<<scs[template_comp_id][segment_comp_id].first.str(cur_seqid)<<std::endl;
-                    }
+                    std::get<1>(stats[template_comp_id][segment_comp_id]).add_attribute("orfanage_status","0");
+                    global_params.out_gtf_fp<<std::get<1>(stats[template_comp_id][segment_comp_id]).str(cur_seqid)<<std::endl;
                 }
             };
             // TODO: need an option to write out discarded transcripts (those that overlap CDS but without a valid CDS)
+
+            // Lastly, write stats about each query
+#ifndef DEBUG
+#pragma omp critical
+#endif
+            {
+                if(stats.empty()){
+                    global_params.stats_fp<<q->get_tid()<<"\t"
+                                          << "-" << "\t"
+                                          << "-" << "\t"
+                                          << "-" << "\t"
+                                          << "-" << "\t"
+                                          << "-" << "\t"
+                                          << "-" << "\t"
+                                          << "-" << "\t"
+                                          << "-" << "\t"
+                                          << "-" << "\t"
+                                          << "-" << "\t"
+                                          << "-" << "\t"
+                                          << "-" << "\t"
+                                          << "-" << "\t"
+                                          << "-" << "\t"
+                                          << "-" << "\t"
+                                          << "-" << "\t"
+                                          << "-" <<std::endl;
+                }
+                else{
+                    for(auto& grp : stats){
+                        for(auto& seg : grp){
+                            global_params.stats_fp<<std::get<1>(seg).get_tid()<<"\t" // query
+                                                  <<std::get<2>(seg).get_tid()<<"\t" // template
+                                                  <<std::get<0>(seg)<<"\t" // segment
+                                                  <<std::get<4>(seg)<<"\t" // notes
+                                                  <<std::get<3>(seg)<<"\t"<<std::endl; // score
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -446,10 +571,11 @@ int main(int argc, char** argv) {
     args.add_option("minlen",ArgParse::Type::INT,"Minimum length of an open reading frame to consider for the analysis",ArgParse::Level::GENERAL,false);
     args.add_option("mode", ArgParse::Type::STRING, "Which CDS to report: ALL, LONGEST, BEST_SCORE. Default: " + global_params.mode, ArgParse::Level::GENERAL, false);
     args.add_option("stats",ArgParse::Type::STRING,"Output a separate file with stats for each query/template pair",ArgParse::Level::GENERAL,false);
-    args.add_option("nc",ArgParse::Type::FLAG,"Write transcripts which do not have CDS as well",ArgParse::Level::GENERAL,false);
     args.add_option("threads",ArgParse::Type::INT,"Number of threads to run in parallel",ArgParse::Level::GENERAL,false);
     args.add_option("use_id",ArgParse::Type::FLAG,"If enabled, only transcripts with the same gene ID from the query file will be used to form a bundle. In this mode the same template transcript may be used in several bundles, if overlaps transcripts with different gene_ids.",ArgParse::Level::GENERAL,false);
     args.add_option("non_aug",ArgParse::Type::FLAG,"If enabled, non-AUG start codons in reference transcripts will not be discarded and will be considered in overlapping query transcripts on equal grounds with the AUG start codon.",ArgParse::Level::GENERAL,false);
+    //TODO: need a flag to preserve OG cds in query
+    args.add_option("keep_cds",ArgParse::Type::FLAG,"If enabled, any CDS already presernt in the query will be kept unmodified.",ArgParse::Level::GENERAL,false);
 
     // Alignment
     args.add_option("pi",ArgParse::Type::INT,"Percent identity between the query and template sequences. This option requires --reference parameter to be set. If enabled - will run alignment between passing pairs.", ArgParse::Level::GENERAL,false);
@@ -611,9 +737,6 @@ int main(int argc, char** argv) {
 #ifndef DEBUG
     omp_set_num_threads(global_params.num_threads);
 #endif
-    if(args.is_set("nc")){
-        global_params.write_all = true;
-    }
 
     if(args.is_set("use_id")){
         global_params.use_id = true;
@@ -621,6 +744,10 @@ int main(int argc, char** argv) {
 
     if(args.is_set("non_aug")){
         global_params.non_aug = true;
+    }
+
+    if(args.is_set("keep_cds")){
+        global_params.keep_cds = true;
     }
 
     global_params.output_fname = args.get_string("output");
@@ -632,6 +759,8 @@ int main(int argc, char** argv) {
         Score s;
         global_params.stats_fp<<"query_id\t"
                                 "template_id\t"
+                                "segment\t"
+                                "notes\t"
                                 <<s.stats_header()<<std::endl;
     }
 

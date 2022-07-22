@@ -69,6 +69,11 @@ public:
         this->phase=-1;
     }
 
+    friend std::ostream& operator<<(std::ostream& os, const SEGTP& s){
+        os << s.get_start() << "-" << s.get_end() << ":" << s.get_phase();
+        return os;
+    };
+
     bool contains(uint pos) const {return pos>=this->start && pos<=this->end;}
     uint32_t get_start() const {return this->start;}
     uint32_t get_start(bool strand){return strand=='+'?this->start:this->end;}
@@ -853,7 +858,7 @@ public:
     char get_nt(int pos) const;
     std::string get_nts(int start,int end) const;
     bool can_add(TX* t,bool use_id=false) const;
-    bool add_tx(TX* t);
+    bool add_tx(TX* t,bool use_id=false);
     void load_seq(GFaSeqGet* seq);
 
     bool has_template() const;
