@@ -164,14 +164,65 @@ int run(){
             if(global_params.stats_fp.is_open()){
                 for(int qi=0;qi<bundle_it->size();qi++) {
                     q = bundle_it->operator[](qi);
+#ifdef DEBUG
+                    if(std::strcmp(q->get_tid().c_str(),"CHS.2524.10")==0){ // rna-XM_011520617.2
+                        std::cout<<"found"<<std::endl;
+                    }
+#endif
                     if(q->is_template()){continue;}
                     std::string cur_seqid;
                     transcriptome.seqid2name(q->get_seqid(),cur_seqid);
-                    global_params.out_gtf_fp<<q->str(cur_seqid)<<std::endl;
+#ifndef DEBUG
+#pragma omp critical
+#endif
+                    {
+                        global_params.out_gtf_fp << q->str(cur_seqid) << std::endl;
+                        global_params.stats_fp << q->get_tid() << "\t"
+                                               << "-" << "\t"
+                                               << "-" << "\t"
+                                               << "-" << "\t"
+                                               << "-" << "\t"
+                                               << "-" << "\t"
+                                               << "-" << "\t"
+                                               << "-" << "\t"
+                                               << "-" << "\t"
+                                               << "-" << "\t"
+                                               << "-" << "\t"
+                                               << "-" << "\t"
+                                               << "-" << "\t"
+                                               << "-" << "\t"
+                                               << "-" << "\t"
+                                               << "-" << "\t"
+                                               << "-" << "\t"
+                                               << "-" << std::endl;
+                    }
+                }
+            }
+            continue;
+        }
+
+        for(int qi=0;qi<bundle_it->size();qi++){
+            stats.clear();
+            q=bundle_it->operator[](qi);
+#ifdef DEBUG
+            if(std::strcmp(q->get_tid().c_str(),"CHS.2524.10")==0){ // rna-XM_011520617.2
+                std::cout<<"found"<<std::endl;
+            }
+#endif
+            if(q->is_template()){continue;}
+            if(global_params.keep_cds && q->has_cds()){
+                q->build_cds();
+                std::string cur_seqid;
+                transcriptome.seqid2name(q->get_seqid(),cur_seqid);
+#ifndef DEBUG
+#pragma omp critical
+#endif
+                {
+                    global_params.out_gtf_fp << q->str(cur_seqid) << std::endl;
                     global_params.stats_fp << q->get_tid() << "\t"
                                            << "-" << "\t"
                                            << "-" << "\t"
-                                           << "-" << "\t"
+                                           << "keep_cds" << "\t"
                                            << "-" << "\t"
                                            << "-" << "\t"
                                            << "-" << "\t"
@@ -187,37 +238,6 @@ int run(){
                                            << "-" << "\t"
                                            << "-" << std::endl;
                 }
-            }
-            continue;
-        }
-
-        for(int qi=0;qi<bundle_it->size();qi++){
-            stats.clear();
-            q=bundle_it->operator[](qi);
-            if(q->is_template()){continue;}
-            if(global_params.keep_cds && q->has_cds()){
-                q->build_cds();
-                std::string cur_seqid;
-                transcriptome.seqid2name(q->get_seqid(),cur_seqid);
-                global_params.out_gtf_fp<<q->str(cur_seqid)<<std::endl;
-                global_params.stats_fp << q->get_tid() << "\t"
-                                       << "-" << "\t"
-                                       << "-" << "\t"
-                                       << "keep_cds" << "\t"
-                                       << "-" << "\t"
-                                       << "-" << "\t"
-                                       << "-" << "\t"
-                                       << "-" << "\t"
-                                       << "-" << "\t"
-                                       << "-" << "\t"
-                                       << "-" << "\t"
-                                       << "-" << "\t"
-                                       << "-" << "\t"
-                                       << "-" << "\t"
-                                       << "-" << "\t"
-                                       << "-" << "\t"
-                                       << "-" << "\t"
-                                       << "-" << std::endl;
                 continue;
             }
             q->remove_cds();
@@ -242,7 +262,7 @@ int run(){
                     // TODO: does it work without sequence avaialble?
 
 #ifdef DEBUG
-                    if(std::strcmp(q->get_tid().c_str(),"rna-NM_001171940.2")==0){ // rna-XM_011520617.2
+                    if(std::strcmp(q->get_tid().c_str(),"CHS.111.42")==0){ // rna-XM_011520617.2
                         std::cout<<"found"<<std::endl;
                     }
 #endif
@@ -506,8 +526,9 @@ int run(){
                     global_params.out_gtf_fp<<std::get<1>(stats[template_comp_id][segment_comp_id]).str(cur_seqid)<<std::endl;
                 }
                 else{
-                    std::get<1>(stats[template_comp_id][segment_comp_id]).add_attribute("orfanage_status","0");
-                    global_params.out_gtf_fp<<std::get<1>(stats[template_comp_id][segment_comp_id]).str(cur_seqid)<<std::endl;
+                    // nothing found - exit
+                    q->add_attribute("orfanage_status","0");
+                    global_params.out_gtf_fp<<q->str(cur_seqid)<<std::endl;
                 }
             };
             // TODO: need an option to write out discarded transcripts (those that overlap CDS but without a valid CDS)
@@ -544,7 +565,7 @@ int run(){
                                                   <<std::get<2>(seg).get_tid()<<"\t" // template
                                                   <<std::get<0>(seg)<<"\t" // segment
                                                   <<std::get<4>(seg)<<"\t" // notes
-                                                  <<std::get<3>(seg)<<"\t"<<std::endl; // score
+                                                  <<std::get<3>(seg)<<std::endl; // score
                         }
                     }
                 }

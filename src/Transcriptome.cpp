@@ -566,10 +566,10 @@ bool Bundle::add_tx(TX* t,bool use_id){
 }
 void Bundle::load_seq(GFaSeqGet* seq){
 #ifdef DEBUG
-    if(this->bstart+this->blen()>seq->getseqlen() || this->bstart<0){
-        std::cerr<<"bundle+stop codon extends past the end of the reference sequence"<<std::endl;
-        exit(2);
-    }
+//    if(this->bstart+this->blen()>=seq->getseqlen() || this->bstart<0){
+//        std::cerr<<"bundle+stop codon extends past the end of the reference sequence"<<std::endl;
+//        exit(2);
+//    }
 #endif
     int tmp_blen = this->blen();
 
@@ -713,17 +713,23 @@ uint Transcriptome::bundleup(bool use_id){ // create bundles and return the tota
     GFaSeqGet* seqid_seq = nullptr;
     int cur_seqid = -1;
     std::string seqid_name;
+    if(this->check_ref && !this->tx_vec.empty()){ // preload reference based on the fron transcript
+        cur_seqid = this->tx_vec.front().get_seqid();
+        int res = this->seqid2name(cur_seqid,seqid_name);
+        assert(res==0);
+        seqid_seq = fastaSeqGet(gfasta, seqid_name.c_str());
+    }
 
     for(auto& t : this->tx_vec){
         if(!this->bundles.back().can_add(&t,use_id)){
             if(this->check_ref){
+                this->bundles.back().load_seq(seqid_seq);
                 if(t.get_seqid()!=cur_seqid){
-                    cur_seqid = this->bundles.back().get_seqid();
+                    cur_seqid = t.get_seqid();
                     int res = this->seqid2name(cur_seqid,seqid_name);
                     assert(res==0);
                     seqid_seq = fastaSeqGet(gfasta, seqid_name.c_str());
                 }
-                this->bundles.back().load_seq(seqid_seq);
             }
             this->bundles.push_back(Bundle());
             this->bundles.back().add_tx(&t,use_id);
@@ -733,12 +739,6 @@ uint Transcriptome::bundleup(bool use_id){ // create bundles and return the tota
         }
     }
     if(this->check_ref){
-        if(cur_seqid==-1){
-            cur_seqid = this->bundles.back().get_seqid();
-            int res = this->seqid2name(cur_seqid,seqid_name);
-            assert(res==0);
-            seqid_seq = fastaSeqGet(gfasta, seqid_name.c_str());
-        }
         this->bundles.back().load_seq(seqid_seq);
     }
 

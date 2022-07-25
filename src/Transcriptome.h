@@ -911,7 +911,15 @@ public:
     void sort(bool use_id=false){
         if(use_id) {
             std::sort(this->tx_vec.begin(), this->tx_vec.end(),[ ]( const TX& lhs, const TX& rhs ){
-                return lhs.get_geneID() < rhs.get_geneID();
+                if(lhs.get_seqid()!=rhs.get_seqid()){
+                    return lhs.get_seqid() < rhs.get_seqid();
+                }
+                else if(lhs.get_strand()!=rhs.get_strand()) {
+                    return lhs.get_strand() < rhs.get_strand();
+                }
+                else{
+                    return lhs.get_geneID() < rhs.get_geneID();
+                }
             });
         }
         else{
