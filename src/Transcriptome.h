@@ -593,7 +593,7 @@ public:
                 if(c2_i == t.chain.size()){ // done
                     left = 0-c1l;
                     if(left!=0){
-                        res.push_back(SEGTP(inter.get_end()+1,cur_c1.get_end(),1));
+                        res.push_back(SEGTP(inter.get_end()+1,cur_c1.get_end(),-1));
                     }
                     for(auto cc= this->chain.begin() + c1_i + 1; cc != this->chain.end(); cc++){
                         left-=cc->slen();

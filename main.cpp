@@ -56,7 +56,7 @@ struct Parameters{
     int len_frame_perc_diff = -1; // percent difference by length of bases in frame of the reference transcript. If -1 (default) is set - the check will not be performed.
     int len_match_perc_diff = -1; // percent difference by length of bases that are in both query and reference. If -1 (default) is set - the check will not be performed.
     int cds_minlen = -1; // minimum length
-    find_mode_t mode = LONGEST_MATCH;
+    std::vector<find_mode_t> mode_array{LONGEST_MATCH,BEST,LONGEST}; // priority order of modes // TODO: we could also add new mode - match start-end
     int num_threads = 1;
 
     // Alignment
@@ -82,6 +82,8 @@ struct Parameters{
 
     bool use_id = false; // if enabled will use query gene ids to form bundles. the same reference id may be evaluated in multiple bundles if overlaps queries with different gene ids
     bool non_aug = false; // If enabled, non-AUG start codons in reference transcripts will not be discarded and will be considered in overlapping query transcripts on equal grounds with the AUG start codon.
+    // TODO: seleno
+    bool seleno = false; // If enabled, all premature stop codons in the reference will be treated as selenocysteine instead and if matched in query - will be retained, but only if the exact position is matched in the same frame.
     bool keep_cds = false; // If enabled, any CDS already presernt in the query will be kept unmodified
 
 } global_params;
@@ -164,6 +166,7 @@ int run(){
             if(global_params.stats_fp.is_open()){
                 for(int qi=0;qi<bundle_it->size();qi++) {
                     q = bundle_it->operator[](qi);
+//                    std::cout<<q->get_tid()<<std::endl;
 #ifdef DEBUG
                     if(std::strcmp(q->get_tid().c_str(),"CHS.2524.10")==0){ // rna-XM_011520617.2
                         std::cout<<"found"<<std::endl;
@@ -205,7 +208,7 @@ int run(){
             stats.clear();
             q=bundle_it->operator[](qi);
 #ifdef DEBUG
-            if(std::strcmp(q->get_tid().c_str(),"CHS.2524.10")==0){ // rna-XM_011520617.2
+            if(std::strcmp(q->get_tid().c_str(),"CHS.10155.1")==0){ // rna-XM_011520617.2
                 std::cout<<"found"<<std::endl;
             }
 #endif
@@ -262,7 +265,7 @@ int run(){
                     // TODO: does it work without sequence avaialble?
 
 #ifdef DEBUG
-                    if(std::strcmp(q->get_tid().c_str(),"CHS.111.42")==0){ // rna-XM_011520617.2
+                    if(std::strcmp(q->get_tid().c_str(),"CHS.10155.1")==0){ // rna-XM_011520617.2
                         std::cout<<"found"<<std::endl;
                     }
 #endif
@@ -445,7 +448,7 @@ int run(){
                     }
                 }
                 else{
-                    std::cerr<<"unknown mode selected for PPP: "<<global_params.ppp_mode<<std::endl;
+                    std::cerr<<"unknown mode selected for PPP: "<<mode_to_str(global_params.ppp_mode)<<std::endl;
                     exit(-7);
                 }
             }
@@ -465,50 +468,62 @@ int run(){
 
                     if(std::get<3>(seg).pass){
                         // evaluate and pick the best choice based on a strategy
-                        switch(global_params.mode){
-                            case LONGEST: // pick the longest
-                                if(best_score.qlen<std::get<3>(seg).qlen){
-                                    template_comp_id = tci;
-                                    segment_comp_id = sci;
-                                    best_score = std::get<3>(seg);
-                                }
-                                break;
-                            case LONGEST_MATCH: //
-                                if(best_score.num_bp_inframe<std::get<3>(seg).num_bp_inframe){
-                                    template_comp_id = tci;
-                                    segment_comp_id = sci;
-                                    best_score = std::get<3>(seg);
-                                }
-                                break;
-                            case BEST: // PI if alignment enabled - otherwise ilpd
-                                if(global_params.percent_ident==-1){ // no alignment was being performed - use ilpd
-                                    if(best_score.ilpd<std::get<3>(seg).ilpd){
+                        for(auto& m : global_params.mode_array){
+                            bool found = false;
+                            switch(m){
+                                case LONGEST: // pick the longest
+                                    if(best_score.qlen < std::get<3>(seg).qlen){
                                         template_comp_id = tci;
                                         segment_comp_id = sci;
                                         best_score = std::get<3>(seg);
+                                        found = true;
                                     }
-                                }
-                                else{
-                                    if(best_score.aln_pi==std::get<3>(seg).aln_pi){ // pick the longest
-                                        if(best_score.qlen<std::get<3>(seg).qlen){
+                                    if(best_score.qlen > std::get<3>(seg).qlen){
+                                        found = true;
+                                    }
+                                    break;
+                                case LONGEST_MATCH: //
+                                    if(best_score.num_bp_inframe < std::get<3>(seg).num_bp_inframe){
+                                        template_comp_id = tci;
+                                        segment_comp_id = sci;
+                                        best_score = std::get<3>(seg);
+                                        found = true;
+                                    }
+                                    if(best_score.num_bp_inframe > std::get<3>(seg).num_bp_inframe){
+                                        found = true;
+                                    }
+                                    break;
+                                case BEST: // PI if alignment enabled - otherwise ilpd
+                                    if(global_params.percent_ident==-1){ // no alignment was being performed - use ilpd
+                                        if(best_score.ilpd < std::get<3>(seg).ilpd){
                                             template_comp_id = tci;
                                             segment_comp_id = sci;
                                             best_score = std::get<3>(seg);
+                                            found = true;
+                                        }
+                                        if(best_score.ilpd > std::get<3>(seg).ilpd){
+                                            found = true;
                                         }
                                     }
                                     else{
-                                        if(best_score.aln_pi<std::get<3>(seg).aln_pi){
+                                        if(best_score.aln_pi < std::get<3>(seg).aln_pi){
                                             template_comp_id = tci;
                                             segment_comp_id = sci;
                                             best_score = std::get<3>(seg);
                                         }
+                                        if(best_score.aln_pi > std::get<3>(seg).aln_pi){
+                                            found = true;
+                                        }
                                     }
-                                }
 
+                                    break;
+                                default:
+                                    std::cerr<<"wrong mode selected"<<std::endl;
+                                    exit(-1);
+                            }
+                            if(found){ // found a better candidate - no need to search further down the mode priority array
                                 break;
-                            default:
-                                std::cerr<<"wrong mode selected"<<std::endl;
-                                exit(-1);
+                            }
                         }
                     }
 
@@ -524,6 +539,7 @@ int run(){
                     std::get<1>(stats[template_comp_id][segment_comp_id]).add_attribute("orfanage_status","1");
                     std::get<1>(stats[template_comp_id][segment_comp_id]).add_attribute("orfanage_template",std::get<1>(stats[template_comp_id][segment_comp_id]).get_template()->get_tid());
                     global_params.out_gtf_fp<<std::get<1>(stats[template_comp_id][segment_comp_id]).str(cur_seqid)<<std::endl;
+                    std::get<4>(stats[template_comp_id][segment_comp_id]) = "gtf";
                 }
                 else{
                     // nothing found - exit
@@ -590,12 +606,11 @@ int main(int argc, char** argv) {
     args.add_option("ilpd",ArgParse::Type::INT,"Percent difference by length of bases in frame of the reference transcript. If -1 (default) is set - the check will not be performed.",ArgParse::Level::GENERAL,false);
     args.add_option("mlpd",ArgParse::Type::INT,"Percent difference by length of bases that are in both query and reference. If -1 (default) is set - the check will not be performed.",ArgParse::Level::GENERAL,false);
     args.add_option("minlen",ArgParse::Type::INT,"Minimum length of an open reading frame to consider for the analysis",ArgParse::Level::GENERAL,false);
-    args.add_option("mode", ArgParse::Type::STRING, "Which CDS to report: ALL, LONGEST, BEST_SCORE. Default: " + global_params.mode, ArgParse::Level::GENERAL, false);
+    args.add_option("mode", ArgParse::Type::STRING, "Which CDS to report: LONGEST, LONGEST_MATCH, BEST. Default: " + mode_to_str(global_params.mode_array.front()), ArgParse::Level::GENERAL, false);
     args.add_option("stats",ArgParse::Type::STRING,"Output a separate file with stats for each query/template pair",ArgParse::Level::GENERAL,false);
     args.add_option("threads",ArgParse::Type::INT,"Number of threads to run in parallel",ArgParse::Level::GENERAL,false);
     args.add_option("use_id",ArgParse::Type::FLAG,"If enabled, only transcripts with the same gene ID from the query file will be used to form a bundle. In this mode the same template transcript may be used in several bundles, if overlaps transcripts with different gene_ids.",ArgParse::Level::GENERAL,false);
     args.add_option("non_aug",ArgParse::Type::FLAG,"If enabled, non-AUG start codons in reference transcripts will not be discarded and will be considered in overlapping query transcripts on equal grounds with the AUG start codon.",ArgParse::Level::GENERAL,false);
-    //TODO: need a flag to preserve OG cds in query
     args.add_option("keep_cds",ArgParse::Type::FLAG,"If enabled, any CDS already presernt in the query will be kept unmodified.",ArgParse::Level::GENERAL,false);
 
     // Alignment
@@ -604,7 +619,7 @@ int main(int argc, char** argv) {
     args.add_option("gape",ArgParse::Type::INT,"Gap-extension penalty", ArgParse::Level::GENERAL,false);
 
     // PhyloCSF++
-    args.add_option("ppp_mode", ArgParse::Type::STRING, "Which CDS to report: LONGEST, BEST. Default: " + global_params.ppp_mode, ArgParse::Level::GENERAL, false);
+    args.add_option("ppp_mode", ArgParse::Type::STRING, "Which CDS to report: LONGEST, BEST. Default: " + mode_to_str(global_params.ppp_mode), ArgParse::Level::GENERAL, false);
     args.add_option("min-score", ArgParse::Type::FLOAT, "Only consider ORFs with a minimum weighted PhyloCSF mean score (range from -15 to +15, >0 more likely to be protein-coding). Default: " + std::to_string(global_params.ppp_minscore), ArgParse::Level::GENERAL, false);
     args.add_option("min-codons", ArgParse::Type::INT, "Only consider ORFs with a minimum codon length. Default: " + std::to_string(global_params.ppp_mincodons), ArgParse::Level::GENERAL, false);
     args.add_option("tracks", ArgParse::Type::STRING, "Path to the bigWig file PhyloCSF+1.bw (expects the other 5 frames to be in the same directory, optionally the power track).",ArgParse::Level::GENERAL, false);
@@ -704,17 +719,27 @@ int main(int argc, char** argv) {
     global_params.ppp_mincodons = args.is_set("min-codons") ? args.get_int("min-codons") : 25;
     global_params.ppp_minscore = args.is_set("min-score") ? args.get_float("min-score") : 0.0;
 
-    global_params.mode = LONGEST_MATCH;
     if (args.is_set("mode")){
+        global_params.mode_array.clear();
+
         std::string mode = args.get_string("mode");
         std::transform(mode.begin(), mode.end(), mode.begin(), toupper);
 
-        if (mode == "LONGEST")
-            global_params.mode = LONGEST;
-        else if (mode == "LONGEST_MATCH")
-            global_params.mode = LONGEST_MATCH;
-        else if (mode == "BEST")
-            global_params.mode = BEST;
+        if (mode == "LONGEST") {
+            global_params.mode_array.push_back(LONGEST);
+            global_params.mode_array.push_back(LONGEST_MATCH);
+            global_params.mode_array.push_back(BEST);
+        }
+        else if (mode == "LONGEST_MATCH") {
+            global_params.mode_array.push_back(LONGEST_MATCH);
+            global_params.mode_array.push_back(BEST);
+            global_params.mode_array.push_back(LONGEST);
+        }
+        else if (mode == "BEST") {
+            global_params.mode_array.push_back(BEST);
+            global_params.mode_array.push_back(LONGEST_MATCH);
+            global_params.mode_array.push_back(LONGEST);
+        }
         else{
             printf(OUT_ERROR "Please choose a valid mode (LONGEST, LONGEST_MATCH, BEST)!\n" OUT_RESET);
             return -1;
@@ -723,17 +748,17 @@ int main(int argc, char** argv) {
 
     global_params.ppp_mode = LONGEST;
     if (args.is_set("ppp_mode")){
-        std::string mode = args.get_string("ppp_mode");
-        std::transform(mode.begin(), mode.end(), mode.begin(), toupper);
+        std::string ppp_mode = args.get_string("ppp_mode");
+        std::transform(ppp_mode.begin(), ppp_mode.end(), ppp_mode.begin(), toupper);
 
-        if (mode == "LONGEST")
-            global_params.mode = LONGEST;
-        else if (mode == "BEST")
-            global_params.mode = BEST;
-        else if (mode == "VALIDATE")
-            global_params.mode = VALIDATE;
+        if (ppp_mode == "LONGEST")
+            global_params.ppp_mode = LONGEST;
+        else if (ppp_mode == "BEST")
+            global_params.ppp_mode = BEST;
+        else if (ppp_mode == "VALIDATE")
+            global_params.ppp_mode = VALIDATE;
         else{
-            printf(OUT_ERROR "Please choose a valid mode (LONGEST, BEST, VALIDATE)!\n" OUT_RESET);
+            printf(OUT_ERROR "Please choose a valid ppp_mode (LONGEST, BEST, VALIDATE)!\n" OUT_RESET);
             return -1;
         }
     }

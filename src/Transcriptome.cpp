@@ -135,7 +135,9 @@ std::string TX::get_attributes() const {
     for(auto& a : this->attrs){
         res+=a.first+" \""+a.second+"\"; ";
     }
-    res.pop_back();
+    if(!res.empty()){
+        res.pop_back();
+    }
     return res;
 }
 void TX::set_bundle_ref(Bundle* b){
@@ -504,9 +506,9 @@ Score TX::score(TX& t) {
     }
 
     // compute lpd, ilpd, mlpd, etc
-    s.lpd = (int) (100.0 * ((float) s.qlen / (float) s.tlen));
-    s.ilpd = (int) (100.0 * ((float) s.num_bp_inframe / (float) s.tlen));
-    s.mlpd = (int) (100.0 * ((float) s.num_bp_match / (float) s.tlen));
+    s.lpd = 100.0 * ((float) s.qlen / (float) s.tlen);
+    s.ilpd = 100.0 * ((float) s.num_bp_inframe / (float) s.tlen);
+    s.mlpd = 100.0 * ((float) s.num_bp_match / (float) s.tlen);
 
     return s;
 }
