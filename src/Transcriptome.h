@@ -103,6 +103,30 @@ public:
         res.clear();
         return 0;
     }
+    void split(SEGTP& s2, SEGTP& res_left, SEGTP& res_inter, SEGTP& res_right){
+        res_left.clear();
+        res_inter.clear();
+        res_right.clear();
+
+        int il = this->intersect(s2,res_inter);
+
+        if(il>0){
+            if(res_inter.get_start()>this->get_start()){
+                res_left = SEGTP(this->get_start(),res_inter.get_start()-1,this->get_phase());
+            }
+            if(res_inter.get_end()<this->get_end()){
+                res_right = SEGTP(res_inter.get_end()+1,this->get_end(),this->get_phase());
+            }
+        }
+        else{
+            if(this->get_start()<s2.get_start()){
+                res_left = SEGTP(this->get_start(),this->get_end(),this->get_phase());
+            }
+            else{
+                res_right = SEGTP(this->get_start(),this->get_end(),this->get_phase());
+            }
+        }
+    }
     int get_union(SEGTP& s2, SEGTP& res){
         int is = std::min(this->start,s2.get_start());
         int ie = this->end_set()?std::max(this->end,s2.get_end()):s2.get_end();
@@ -127,6 +151,10 @@ public:
             return false;
         }
         return true;
+    }
+
+    bool operator< (const SEGTP& s) const{
+        return this->get_start()==s.get_start() ? this->get_end()<s.get_end() : this->get_start()<s.get_start();
     }
 
 private:
@@ -199,6 +227,7 @@ public:
     uint16_t size() const {return this->chain.size();};
     SEGTP& operator[](int idx){return this->chain[idx];}
     void push_back(SEGTP seg){this->chain.push_back(seg);}
+    void pop_back(){this->chain.pop_back();}
     SEGTP& back(){return this->chain.back();}
     int get_idx(int val){ // return the index of the segment containing a value or -1 if such is not found
         int i=0;
@@ -476,7 +505,54 @@ public:
         return phase;
     }
 
-    void compare(CHAIN& t,CHAIN& res){
+    void compare(CHAIN&t, CHAIN& res){
+        res.clear();
+
+        CHAIN intervals;
+        for(auto v : this->chain){
+            intervals.push_back(SEGTP(v.get_start(),v.get_end(),-1));
+        }
+        for(auto v : t.chain){
+            intervals.push_back(SEGTP(v.get_start(),v.get_end(),1));
+        }
+        std::sort(intervals.begin(),intervals.end());
+
+        if(intervals.size()==0){
+            return;
+        }
+
+        res.push_back(intervals[0]);
+
+        SEGTP left,inter,right,tmp;
+        for(int i=1;i<intervals.size();i++){
+            res.back().split(intervals[i],left,inter,right);
+            if(!right.empty()){
+#ifdef DEBUG
+                assert(inter.slen()==intervals[i].slen());
+#endif
+            }
+            else{
+                intervals[i].split(res.back(),tmp,inter,right);
+#ifdef DEBUG
+                assert(tmp.empty());
+#endif
+            }
+            res.pop_back();
+
+            if(!left.empty()){
+                res.push_back(left);
+            }
+            if(!inter.empty()){
+                inter.set_phase(0);
+                res.push_back(inter);
+            }
+            if(!right.empty()){
+                res.push_back(right);
+            }
+        }
+    }
+
+    void compare_old(CHAIN& t,CHAIN& res){
         res.clear();
 
         int c1_i=0,c2_i=0;
