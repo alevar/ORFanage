@@ -136,7 +136,7 @@ int run(){
     transcriptome.set_cds_as_exons();
     transcriptome.remove_non_coding();
 
-    rstats.template_duplicates = transcriptome.deduplicate();
+    rstats.template_duplicates = transcriptome.deduplicate(global_params.use_id);
 
     std::cerr<<"loading query transcriptome"<<std::endl;
     transcriptome.add(global_params.query_fname,false,false);
@@ -168,7 +168,7 @@ int run(){
                     q = bundle_it->operator[](qi);
 //                    std::cout<<q->get_tid()<<std::endl;
 #ifdef DEBUG
-                    if(std::strcmp(q->get_tid().c_str(),"CHS.2524.10")==0){ // rna-XM_011520617.2
+                    if(std::strcmp(q->get_tid().c_str(),"CHS.11626.7")==0){ // rna-XM_011520617.2
                         std::cout<<"found"<<std::endl;
                     }
 #endif
@@ -208,7 +208,7 @@ int run(){
             stats.clear();
             q=bundle_it->operator[](qi);
 #ifdef DEBUG
-            if(std::strcmp(q->get_tid().c_str(),"CHS.10155.1")==0){ // rna-XM_011520617.2
+            if(std::strcmp(q->get_tid().c_str(),"CHS.11626.7")==0){ // rna-XM_011520617.2
                 std::cout<<"found"<<std::endl;
             }
 #endif
@@ -265,7 +265,7 @@ int run(){
                     // TODO: does it work without sequence avaialble?
 
 #ifdef DEBUG
-                    if(std::strcmp(q->get_tid().c_str(),"CHS.18960.5")==0){ // rna-XM_011520617.2
+                    if(std::strcmp(q->get_tid().c_str(),"CHS.11626.7")==0){ // rna-XM_011520617.2
                         std::cout<<"found"<<std::endl;
                     }
 #endif

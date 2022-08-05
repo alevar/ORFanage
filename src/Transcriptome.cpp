@@ -809,10 +809,20 @@ uint Transcriptome::clean_cds(bool rescue){
     }
     return res;
 }
-uint Transcriptome::deduplicate(){
+uint Transcriptome::deduplicate(bool use_id){
     uint old_transcriptome_size = this->tx_vec.size();
 
-    this->tx_vec.erase( std::unique( this->tx_vec.begin(), this->tx_vec.end() ), this->tx_vec.end() );
+    if(!use_id){
+        this->tx_vec.erase( std::unique( this->tx_vec.begin(), this->tx_vec.end() ), this->tx_vec.end() );
+    }
+    else{
+        this->tx_vec.erase( std::unique( this->tx_vec.begin(), this->tx_vec.end(), [](const TX& lhs, const TX& rhs) {
+                                                    if(lhs.get_geneID()!=rhs.get_geneID()){
+                                                        return false;
+                                                    }
+                                                    return lhs==rhs;
+                                                }), this->tx_vec.end() );
+    }
 
     return old_transcriptome_size - this->tx_vec.size();
 }

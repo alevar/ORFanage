@@ -831,6 +831,7 @@ public:
               << this->get_strand() << "\t"
               << "." << "\t"
               << "transcript_id \""+this->get_tid()+"\"; "
+              << "gene_id \""+this->get_geneID()+"\"; "
               << this->get_attributes()
               << std::endl;
 
@@ -1007,7 +1008,7 @@ public:
     void build_cds_chains();
     uint clean_short_orfs(int minlen);
     uint clean_cds(bool rescue=false);
-    uint deduplicate();
+    uint deduplicate(bool use_id=false);
     void set_cds_as_exons();
     void remove_non_coding();
     void correct_chain_len();
