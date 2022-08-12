@@ -179,6 +179,9 @@ int run(){
 #pragma omp critical
 #endif
                     {
+                        if(global_params.keep_cds && q->has_cds()) {
+                            q->build_cds();
+                        }
                         global_params.out_gtf_fp << q->str(cur_seqid) << std::endl;
                         global_params.stats_fp << q->get_tid() << "\t"
                                                << "-" << "\t"
