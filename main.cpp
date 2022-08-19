@@ -48,6 +48,22 @@ std::string mode_to_str(const find_mode_t mode) noexcept{
     return mode_str;
 }
 
+struct DEFAULTS{
+    int len_perc_diff = -1; // percent difference by length between the original and reference transcripts. If -1 (default) is set - the check will not be performed.
+    int len_frame_perc_diff = -1; // percent difference by length of bases in frame of the reference transcript. If -1 (default) is set - the check will not be performed.
+    int len_match_perc_diff = -1; // percent difference by length of bases that are in both query and reference. If -1 (default) is set - the check will not be performed.
+    int cds_minlen = -1; // minimum length
+    int num_threads = 1;
+
+    // Alignment
+    int percent_ident = -1; // percent identity
+    int gapo = 4; // gap open
+    int gape = 2; // gap extend
+
+    int ppp_mincodons = 25;
+    float ppp_minscore = 0.0;
+} def_params;
+
 struct Parameters{
     bool clean_query = false;
     bool clean_templ = false;
@@ -719,8 +735,8 @@ int main(int argc, char** argv) {
         global_params.ppp_track_fname = args.get_string("tracks");
     }
 
-    global_params.ppp_mincodons = args.is_set("min-codons") ? args.get_int("min-codons") : 25;
-    global_params.ppp_minscore = args.is_set("min-score") ? args.get_float("min-score") : 0.0;
+    global_params.ppp_mincodons = args.is_set("min-codons") ? args.get_int("min-codons") : def_params.ppp_mincodons;
+    global_params.ppp_minscore = args.is_set("min-score") ? args.get_float("min-score") : def_params.ppp_minscore;
 
     if (args.is_set("mode")){
         global_params.mode_array.clear();
@@ -773,16 +789,16 @@ int main(int argc, char** argv) {
         assert(args.is_set("reference"));
     }
 
-    global_params.cds_minlen = args.is_set("minlen") ? args.get_int("minlen") : 36;
-    global_params.len_perc_diff = args.is_set("lpd") ? args.get_int("lpd") : 50;
-    global_params.len_frame_perc_diff = args.is_set("ilpd") ? args.get_int("ilpd") : 50;
-    global_params.len_match_perc_diff = args.is_set("mlpd") ? args.get_int("mlpd") : 50;
-    global_params.percent_ident = args.is_set("pi") ? args.get_int("pi") : -1;
+    global_params.cds_minlen = args.is_set("minlen") ? args.get_int("minlen") : def_params.cds_minlen;
+    global_params.len_perc_diff = args.is_set("lpd") ? args.get_int("lpd") : def_params.len_perc_diff;
+    global_params.len_frame_perc_diff = args.is_set("ilpd") ? args.get_int("ilpd") : def_params.len_frame_perc_diff;
+    global_params.len_match_perc_diff = args.is_set("mlpd") ? args.get_int("mlpd") : def_params.len_match_perc_diff;
+    global_params.percent_ident = args.is_set("pi") ? args.get_int("pi") : def_params.percent_ident;
 
-    global_params.gapo = args.is_set("gapo") ? args.get_int("gapo") : 4;
-    global_params.gape = args.is_set("gape") ? args.get_int("gape") : 2;
+    global_params.gapo = args.is_set("gapo") ? args.get_int("gapo") : def_params.gapo;
+    global_params.gape = args.is_set("gape") ? args.get_int("gape") : def_params.gape;
 
-    global_params.num_threads = args.is_set("threads") ? args.get_int("threads") : 1;
+    global_params.num_threads = args.is_set("threads") ? args.get_int("threads") : def_params.num_threads;
 #ifndef DEBUG
     omp_set_num_threads(global_params.num_threads);
 #endif
