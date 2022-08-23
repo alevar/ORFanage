@@ -167,10 +167,16 @@ int run(){
     transcriptome.bundleup(global_params.use_id);
 
     std::cerr<<"starting main evaluation"<<std::endl;
+
 #ifndef DEBUG
     #pragma omp parallel for
 #endif
-    for(auto bundle_it=transcriptome.bbegin(); bundle_it!=transcriptome.bend(); bundle_it++){ // iterate over bundles
+    for(int bi=0;bi<transcriptome.bsize();bi++){ // iterate over bundles
+        std::vector<Bundle>::iterator bundle_it = transcriptome.bbegin();
+        bundle_it+=bi;
+//        std::cout<<"test: "<<std::endl;
+//        std::cout<<bundle_it->operator[](0)->get_tid()<<std::endl;
+//    for(auto bundle_it=transcriptome.bbegin(); bundle_it!=transcriptome.bend(); bundle_it++){ // iterate over bundles
 
         std::vector<std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>> stats; // segment,query,template,score,notes
         TX *q,*t;

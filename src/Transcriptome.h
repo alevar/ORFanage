@@ -899,6 +899,8 @@ public:
     bit bend() {return this->bundles.end();}
     cbit cbend() const { return this->bundles.cend();}
 
+    int bsize(){return this->bundles.size();}
+
 
     // PhyloCSF++
     std::pair<SEGTP,float> compute_tx_cds_ppp(TX& tx);
