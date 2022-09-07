@@ -89,15 +89,6 @@ include_directories(${klib_SOURCE_DIR})
 # GCLIB
 include_directories("${CMAKE_SOURCE_DIR}/include/")
 
-# HTSLIB
-link_directories("${CMAKE_SOURCE_DIR}/include/htslib")
-ExternalProject_Add(htslib
-        SOURCE_DIR ${CMAKE_SOURCE_DIR}/include/htslib/
-        BUILD_IN_SOURCE 1
-        CONFIGURE_COMMAND autoreconf --install COMMAND ./configure --host=x86_64 --without-libdeflate --disable-libcurl
-        BUILD_COMMAND ${MAKE}
-        INSTALL_COMMAND ""
-        )
 
 add_executable(orfanage
         ${CMAKE_SOURCE_DIR}/include/gclib/gff.h
@@ -140,12 +131,12 @@ add_executable(orfanage
 #    target_compile_definitions(orfanage PUBLIC DEBUG=0)
 #endif()
 
-add_dependencies(orfanage htslib libBigWig)
+add_dependencies(orfanage libBigWig)
 
 if (APPLE AND ORFANAGE_STATIC_BUILD)
-    target_link_libraries(orfanage ${CMAKE_SOURCE_DIR}/include/libBigWig/libBigWig.a ${CMAKE_SOURCE_DIR}/include/htslib/libhts.a z lzma bz2 pthread)
+    target_link_libraries(orfanage ${CMAKE_SOURCE_DIR}/include/libBigWig/libBigWig.a z)
 else ()
-    target_link_libraries(orfanage ${CMAKE_SOURCE_DIR}/include/libBigWig/libBigWig.a ${CMAKE_SOURCE_DIR}/include/htslib/libhts.a z lzma bz2 pthread)
+    target_link_libraries(orfanage ${CMAKE_SOURCE_DIR}/include/libBigWig/libBigWig.a z)
 endif ()
 
 install(TARGETS orfanage DESTINATION ${CMAKE_INSTALL_PREFIX})
