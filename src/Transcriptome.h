@@ -17,7 +17,6 @@
 #include "common.hpp"
 #include "gff_utils.h"
 
-#include <htslib/htslib/sam.h>
 #include <libBigWig/bigWig.h>
 #include <sstream>
 
@@ -730,8 +729,9 @@ public:
                 ++c_it;
             }
         }
-        os<<"\b \b";
+//        os<<"\b \b";
         std::string s = os.str();
+        s.pop_back();
         return s;
     }
 
