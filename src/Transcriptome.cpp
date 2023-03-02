@@ -675,6 +675,7 @@ void Transcriptome::load_ppptracks(){
     }
 }
 void Transcriptome::add(const std::string& gtf_fname,bool is_templ,bool coding_only) {
+    this->bundles.clear(); // any pointers that previously existed will be invalidated when new data is added
     FILE *gff_file = fopen(gtf_fname.c_str(), "r");
     if (gff_file == nullptr) {
         std::cerr << "@ERROR::Couldn't open the GTF: " << gtf_fname << std::endl;

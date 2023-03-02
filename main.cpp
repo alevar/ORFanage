@@ -391,12 +391,14 @@ int  run(){
                     qseg.store_template(t);
                     std::get<1>(stats.back().back())=qseg;
                 }
-#ifdef DEBUG
+
                 // can we select a single segment to proceed with at this point?
-                if(stats.back().size()>1){
-                    std::cerr<<"found more than one valid segment"<<std::endl;
-                }
-#endif
+//                if(stats.back().size()>1 && global_params.all_gtf){
+//                    // write each complete unique segment to the GTF and exit
+//#ifdef DEBUG
+//                    std::cerr<<"found more than one valid segment"<<std::endl;
+//#endif
+//                }
                 segments.clear();
             }
 
