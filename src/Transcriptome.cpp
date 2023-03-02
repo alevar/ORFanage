@@ -220,7 +220,7 @@ int TX::next_positions(int last_position,uint num_positions,std::string& nc, boo
     return this->positions(np,num_positions,nc,forward);
 }
 char TX::get_codon_aa(uint pos){
-    if(!this->seq.is_translated()){
+    if(this->seq.is_translated()){
         return this->seq.get_aa(pos);
     }
     else{ // we did not pre-load the sequence and need to specifically load just the codon
@@ -784,26 +784,29 @@ uint Transcriptome::clean_short_orfs(int minlen){
 uint Transcriptome::clean_cds(bool rescue){
     uint res = 0;
 
-    bundleup();
+    this->bundleup();
     for(auto& bundle : this->bundles){
         for(auto& tx : bundle){
             if(!tx->has_cds()){continue;}
+            tx->load_seq();
 
             if(this->check_ref){
                 if(rescue){
-                    tx->load_seq();
                     tx->rescue_cds(this->allow_non_aug); // TODO: allow non aug - needs to allow storage of non-aug transcripts (only perform cleaning based on stop codons) and no start extension. And needs to handle querrying appropriately
                 }
                 char start_codon = tx->get_codon_aa(0);
                 char stop_codon = tx->get_codon_aa(tx->aa_len()-1);
                 if((start_codon!='M' && !this->allow_non_aug) || stop_codon!='.'){
                     res++;
+                    tx->remove_cds();
                     continue;
                 }
             }
 
             if(tx->cds_len()%3 != 0){
                 res++;
+                tx->remove_cds();
+                continue;
             }
         }
     }

@@ -112,7 +112,10 @@ struct RunStats{
     uint template_duplicates = 0; // number of duplcate ORFs discarded
 } rstats;
 
-int run(){
+int  run(){
+    #ifndef DEBUG
+        std::cout<<"Running in DEBUG"<<std::endl;
+    #endif
     // load the reference GFF
     std::cerr<<"loading reference genome"<<std::endl;
     Transcriptome transcriptome;
@@ -169,7 +172,7 @@ int run(){
     std::cerr<<"starting main evaluation"<<std::endl;
 
 #ifndef DEBUG
-    #pragma omp parallel for
+    #pragma omp parallel for schedule(dynamic)
 #endif
     for(int bi=0;bi<transcriptome.bsize();bi++){ // iterate over bundles
         std::vector<Bundle>::iterator bundle_it = transcriptome.bbegin();
@@ -390,7 +393,7 @@ int run(){
                 }
 #ifdef DEBUG
                 // can we select a single segment to proceed with at this point?
-                if(stats.back().size()>1){ // TODO: superflous since we are keeping track of all segments - even duplicates here...
+                if(stats.back().size()>1){
                     std::cerr<<"found more than one valid segment"<<std::endl;
                 }
 #endif
