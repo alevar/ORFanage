@@ -42,6 +42,7 @@ TX::TX(uint seqid, GffObj* tx,int idx,bool is_templ){
     this->seqid = seqid;
     this->strand = tx->strand;
     this->source = tx->getTrackName();
+    this->cds_source = tx->getTrackName();
     for(int i=0;i<tx->exons.Count();i++){
         this->exons.push_back(SEGTP((int)tx->exons.Get(i)->start,(int)tx->exons.Get(i)->end,0));
     }

@@ -272,6 +272,7 @@ int  run(){
                 continue;
             }
             q->remove_cds();
+            q->set_cds_source("ORFanage");
 
             for(int ti=0;ti<bundle_it->size();ti++){
                 t=bundle_it->operator[](ti);
@@ -567,6 +568,7 @@ int  run(){
             {
                 if(template_comp_id>=0 && segment_comp_id>=0){ // found something
                     std::get<1>(stats[template_comp_id][segment_comp_id]).add_attribute("orfanage_status","1");
+                    std::get<1>(stats[template_comp_id][segment_comp_id]).add_attribute("orfanage_template_source",std::get<1>(stats[template_comp_id][segment_comp_id]).get_template()->get_source());
                     std::get<1>(stats[template_comp_id][segment_comp_id]).add_attribute("orfanage_template",std::get<1>(stats[template_comp_id][segment_comp_id]).get_template()->get_tid());
                     global_params.out_gtf_fp<<std::get<1>(stats[template_comp_id][segment_comp_id]).str(cur_seqid)<<std::endl;
                     std::get<4>(stats[template_comp_id][segment_comp_id]) = "gtf";

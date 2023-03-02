@@ -564,6 +564,7 @@ public:
     TX(uint seqid, GffObj* tx,int idx,bool is_templ);
 
     bool has_cds() const {return this->is_coding;}
+    void set_cds_source(std::string new_source){this->cds_source = new_source;}
     void set_cds_start(int cs){this->cds_start = cs;}
     void set_cds_end(int ce){this->cds_end = ce;}
     void set_cds_phase(int start_phase);
@@ -579,6 +580,7 @@ public:
     int get_invariant_end() const{return this->is_coding ? this->get_end() : this->get_cds_end();}
     int get_seqid() const{return this->seqid;}
     char get_strand() const{return this->strand;}
+    std::string get_source() const{return this->source;}
     std::string get_tid() const{return this->tid;}
     int get_id() const{return this->id;}
     std::string get_geneID() const{return this->gid;}
@@ -717,7 +719,7 @@ public:
             auto c_it = this->cds.cbegin();
             while(c_it != this->cds.cend()){
                 os << seqid << "\t"
-                   << this->source << "\t"
+                   << this->cds_source << "\t"
                    << "CDS" << "\t"
                    << c_it->get_start() << "\t"
                    << c_it->get_end() << "\t"
@@ -775,6 +777,7 @@ private:
     int cds_phase = 0;
     bool is_coding = false;
     std::string source;
+    std::string cds_source;
 
     std::map<std::string,std::string> attrs;
 
