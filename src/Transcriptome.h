@@ -19,6 +19,7 @@
 
 #include <libBigWig/bigWig.h>
 #include <sstream>
+#include <set>
 
 #include "aln.hpp"
 
@@ -562,7 +563,32 @@ public:
     TX() = default;
     ~TX() = default;
     TX(uint seqid, GffObj* tx,int idx,bool is_templ);
+    TX(const TX& tmpl){
+        this->is_templ = tmpl.is_templ;
+        this->id = tmpl.id;
+        this->tid = tmpl.tid;
+        this->gid = tmpl.gid;
+        this->seqid = tmpl.seqid;
+        this->strand = tmpl.strand;
+        this->cds_start = tmpl.cds_start;
+        this->cds_end = tmpl.cds_end;
+        this->cds_phase = tmpl.cds_phase;
+        this->is_coding = tmpl.is_coding;
+        this->source = tmpl.source;
+        this->cds_source = tmpl.cds_source;
 
+        this->attrs = tmpl.attrs;
+
+        this->exons = tmpl.exons;
+        this->cds = tmpl.cds;
+
+        this->seq = tmpl.seq;
+
+        this->bundle = tmpl.bundle;
+        this->ref_tx = tmpl.ref_tx;
+    }
+
+    void set_tid(std::string new_tid) {this->tid = new_tid;}
     bool has_cds() const {return this->is_coding;}
     void set_cds_source(std::string new_source){this->cds_source = new_source;}
     void set_cds_start(int cs){this->cds_start = cs;}
@@ -686,6 +712,16 @@ public:
         }
     }
 
+    int merge(TX& tx){
+        this->dup_tids.insert(tx.dup_tids.begin(), tx.dup_tids.end() );
+        this->dup_tids.insert(tx.get_tid());
+        return this->dup_tids.size();
+    }
+
+    int num_dups(){
+        return this->dup_tids.size();
+    }
+
     std::string str(std::string& seqid){
         std::stringstream os;
         os << seqid << "\t"
@@ -788,6 +824,8 @@ private:
 
     Bundle *bundle = nullptr;
     TX* ref_tx = nullptr;
+
+    std::set<std::string> dup_tids;
 };
 
 class Bundle{
@@ -862,8 +900,11 @@ public:
                 else if(lhs.get_strand()!=rhs.get_strand()) {
                     return lhs.get_strand() < rhs.get_strand();
                 }
-                else{
+                else if(lhs.get_geneID()!=rhs.get_geneID()){
                     return lhs.get_geneID() < rhs.get_geneID();
+                }
+                else{
+                    return lhs<rhs;
                 }
             });
         }

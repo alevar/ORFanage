@@ -97,7 +97,7 @@ Options:
                       performed.
   --minlen INT        Minimum length of an open reading frame to consider for the
                       analysis
-  --mode STRING       Which CDS to report: LONGEST, LONGEST_MATCH, BEST. Default:
+  --mode STRING       Which CDS to report: ALL,     LONGEST, LONGEST_MATCH, BEST. Default:
                       LONGEST_MATCH
   --stats STRING      Output a separate file with stats for each query/template pair
   --threads INT       Number of threads to run in parallel

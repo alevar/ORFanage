@@ -814,19 +814,37 @@ uint Transcriptome::clean_cds(bool rescue){
     }
     return res;
 }
+
+// removes duplicate transcripts (same exon chain)
+// if requested - also removes transcripts with the same CDS chains
+// transcript IDs are merged into the parenting transcript
+// if requested - comparisons are only made between transcripts with the same geneID
 uint Transcriptome::deduplicate(bool use_id){
+    // first deduplicate based on transcripts
+
     uint old_transcriptome_size = this->tx_vec.size();
 
-    if(!use_id){
-        this->tx_vec.erase( std::unique( this->tx_vec.begin(), this->tx_vec.end() ), this->tx_vec.end() );
-    }
-    else{
-        this->tx_vec.erase( std::unique( this->tx_vec.begin(), this->tx_vec.end(), [](const TX& lhs, const TX& rhs) {
-                                                    if(lhs.get_geneID()!=rhs.get_geneID()){
-                                                        return false;
-                                                    }
-                                                    return lhs==rhs;
-                                                }), this->tx_vec.end() );
+    auto it = this->tx_vec.begin();
+    it++; // move to the second element since the first will always be retained
+    auto prev_it = this->tx_vec.begin();
+    while(it != this->tx_vec.end()) {
+        if(use_id){
+           if(it->get_geneID() != prev_it->get_geneID()){
+               prev_it = it;
+               it++;
+               continue;
+           }
+        }
+
+        if(*it==*prev_it){ // duplicates - need remove
+            // deduplicate
+            it->merge(*prev_it);
+            it = this->tx_vec.erase(it);
+            continue;
+        }
+
+        prev_it = it;
+        it++;
     }
 
     return old_transcriptome_size - this->tx_vec.size();

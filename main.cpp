@@ -20,6 +20,7 @@
 #include "Transcriptome.h"
 
 enum find_mode_t{
+    ALL, // report all complete orfs
     LONGEST, // longest complete orf;
     LONGEST_MATCH, // default (highest number of inframe bases shared above thresholds) - if alignment specified - will be decided by alignment instead;
     BEST, // closest to the reference (even if not as long
@@ -29,6 +30,9 @@ enum find_mode_t{
 std::string mode_to_str(const find_mode_t mode) noexcept{
     std::string mode_str;
     switch (mode){
+        case ALL:
+            mode_str = "ALL";
+            break;
         case LONGEST:
             mode_str = "LONGEST";
             break;
@@ -72,7 +76,7 @@ struct Parameters{
     int len_frame_perc_diff = -1; // percent difference by length of bases in frame of the reference transcript. If -1 (default) is set - the check will not be performed.
     int len_match_perc_diff = -1; // percent difference by length of bases that are in both query and reference. If -1 (default) is set - the check will not be performed.
     int cds_minlen = -1; // minimum length
-    std::vector<find_mode_t> mode_array{LONGEST_MATCH,BEST,LONGEST}; // priority order of modes // TODO: we could also add new mode - match start-end
+    std::vector<find_mode_t> mode_array{ALL,LONGEST_MATCH,BEST,LONGEST}; // priority order of modes // TODO: we could also add new mode - match start-end
     int num_threads = 1;
 
     // Alignment
@@ -104,13 +108,203 @@ struct Parameters{
 
 } global_params;
 
-typedef std::vector<std::vector<std::pair<TX,Score>>> Scores;
-
 struct RunStats{
     uint num_too_short = 0; // number of template isoforms with ORF that is too short
     uint num_dirty = 0; // number of template isoforms with incorrect/unsuitable ORFs (other than short)
     uint template_duplicates = 0; // number of duplcate ORFs discarded
 } rstats;
+
+bool score_lt(const Score& lhs, const Score& rhs){
+    if(lhs.pass!=rhs.pass){
+        return lhs.pass < rhs.pass;
+    }
+    for(auto& m : global_params.mode_array){
+        switch(m){
+            case ALL: // skip - only relevant later
+                break;
+            case LONGEST: // pick the longest
+                if(lhs.qlen != rhs.qlen){
+                    return lhs.qlen < rhs.qlen;
+                }
+                break;
+            case LONGEST_MATCH:
+                if(lhs.num_bp_inframe != rhs.num_bp_inframe){
+                    return lhs.num_bp_inframe < rhs.num_bp_inframe;
+                }
+                break;
+            case BEST: // PI if alignment enabled - otherwise ilpd
+                if(global_params.percent_ident==-1){ // no alignment was being performed - use ilpd
+                    if(lhs.ilpd != rhs.ilpd){
+                        return lhs.ilpd < rhs.ilpd;
+                    }
+                }
+                else{
+                    if(lhs.aln_pi != rhs.aln_pi){
+                        return lhs.aln_pi < rhs.aln_pi;
+                    }
+                }
+                break;
+            default:
+                std::cerr<<"wrong mode selected"<<std::endl;
+                exit(-1);
+        }
+    }
+    return lhs.tlen < rhs.tlen;
+}
+
+bool score_gt(const Score& lhs, const Score& rhs){
+    if(lhs.pass!=rhs.pass){
+        return lhs.pass > rhs.pass;
+    }
+    for(auto& m : global_params.mode_array){
+        switch(m){
+            case ALL: // skip - only relevant later
+                break;
+            case LONGEST: // pick the longest
+                if(lhs.qlen != rhs.qlen){
+                    return lhs.qlen > rhs.qlen;
+                }
+                break;
+            case LONGEST_MATCH:
+                if(lhs.num_bp_inframe != rhs.num_bp_inframe){
+                    return lhs.num_bp_inframe > rhs.num_bp_inframe;
+                }
+                break;
+            case BEST: // PI if alignment enabled - otherwise ilpd
+                if(global_params.percent_ident==-1){ // no alignment was being performed - use ilpd
+                    if(lhs.ilpd != rhs.ilpd){
+                        return lhs.ilpd > rhs.ilpd;
+                    }
+                }
+                else{
+                    if(lhs.aln_pi != rhs.aln_pi){
+                        return lhs.aln_pi > rhs.aln_pi;
+                    }
+                }
+                break;
+            default:
+                std::cerr<<"wrong mode selected"<<std::endl;
+                exit(-1);
+        }
+    }
+    return lhs.tlen > rhs.tlen;
+}
+
+// groups duplicate ORFs and selects representative template (maximizing score within each group)
+// returns map of start/end coordinates as keys to a vector of query/template pairs with scores
+std::map<std::pair<int,int>,std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>> flatten(std::vector<std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>>& stats){
+    std::map<std::pair<int,int>,std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>> flat;
+    std::pair<std::map<std::pair<int,int>,std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>>::iterator,bool> fit;
+    for(auto& grp : stats){
+        for(auto& sub : grp){
+            int start = std::get<1>(sub).get_cds_start();
+            int end = std::get<1>(sub).get_cds_end();
+            std::pair<int,int> key = std::make_pair(start,end);
+
+            fit = flat.insert(std::make_pair(key,std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>{}));
+            fit.first->second.emplace_back(sub);
+        }
+    }
+    // sort each vector of transcripts by score
+    for(auto& kv : flat){
+        std::sort(kv.second.begin(),kv.second.end(), [ ]( const std::tuple<SEGTP,TX,TX,Score,std::string>& lhs, const std::tuple<SEGTP,TX,TX,Score,std::string>& rhs )
+        {
+            return score_gt(std::get<3>(lhs),std::get<3>(rhs));
+        });
+    }
+    return flat;
+}
+
+// returns -1,-1 if nothing passing has been found
+std::pair<int,int> find_best_stat(std::map<std::pair<int,int>,std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>>& stats_flat){
+    std::pair<int,int> best_se = stats_flat.begin()->first;
+    Score best_score = std::get<3>(stats_flat.begin()->second.front());
+    for(auto& kv : stats_flat){
+        if (score_gt(best_score,std::get<3>(kv.second.front()))){
+            best_score = std::get<3>(kv.second.front());
+            best_se = kv.first;
+        }
+    }
+    if(!best_score.pass){ // nothing found
+        return std::make_pair(-1,-1);
+    }
+    return best_se;
+}
+
+int run_align(std::vector<std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>>& stats, Finder* fndr){
+    for(auto& sc : stats){
+        for(auto& seg : sc){
+            if(!std::get<3>(seg).pass){continue;}
+
+            if (!std::get<1>(seg).get_template()->seq_loaded()) {std::get<1>(seg).get_template()->load_seq();} // only load sequence if not previously loaded
+            ksw_extz_t ez;
+            fndr->align(std::get<1>(seg).get_template()->get_aa().c_str(), std::get<1>(seg).get_aa().c_str(), ez);
+            if (ez.n_cigar == 0) {
+                std::get<3>(seg).pass =false;
+            }
+            else{
+                int ret = fndr->parse(ez, std::get<1>(seg).get_aa(), std::get<1>(seg).get_template()->get_aa(), std::get<3>(seg));
+                std::get<3>(seg).aln_match = std::get<3>(seg).num_aln_match();
+                std::get<3>(seg).aln_pi = std::get<3>(seg).pi();
+                if (ret < 0 || std::get<3>(seg).aln_pi < global_params.percent_ident) {
+                    std::get<3>(seg).pass = false;
+                }
+            }
+            free(ez.cigar);
+        }
+    }
+    return 1;
+}
+
+void run_ppp(std::vector<std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>>& stats,Transcriptome& transcriptome, TX* q, TX* t){
+    if(global_params.ppp_mode==LONGEST || global_params.ppp_mode==BEST){ // todo: add to the stats
+        std::pair<SEGTP,float> ppp_chain = transcriptome.compute_tx_cds_ppp(*q);
+
+        TX qseg = *q;
+        qseg.set_cds_start(std::get<0>(ppp_chain).get_start());
+        qseg.set_cds_end(std::get<0>(ppp_chain).get_end());
+        qseg.set_cds_phase(std::get<0>(ppp_chain).get_phase());
+        qseg.build_cds();
+
+        if(qseg.cds_chain()->clen()<global_params.cds_minlen){return;}
+
+        Score qseg_score = qseg.score(*t);
+        qseg_score.ppp_score = std::get<1>(ppp_chain);
+        stats.back().push_back(std::make_tuple(std::get<0>(ppp_chain),qseg,*t,qseg_score,"ppp"));
+        if(qseg_score.lpd<global_params.len_perc_diff ||
+           qseg_score.ilpd<global_params.len_frame_perc_diff ||
+           qseg_score.mlpd<global_params.len_match_perc_diff){
+            std::get<3>(stats.back().back()).pass = false;
+            return;
+        }
+    }
+    else if(global_params.ppp_mode==VALIDATE){ // only perform validation of novel transcripts
+        const uint64_t chr_len = transcriptome.get_chrom_len(q->get_seqid());
+        std::array<std::vector<std::vector<float> >, 4> extracted_scores; // phase 0, phase 1, phase 2, power
+        transcriptome.compute_PhyloCSF_for_transcript(*q, extracted_scores);(*q, extracted_scores);
+
+        for(auto& sc : stats){
+            for(auto& seg : sc){
+                if(!std::get<3>(seg).pass){continue;}
+
+                bool ppp_pass = true;
+                std::tuple<float, float> ppp_scores = transcriptome.compute_PhyloCSF(std::get<1>(seg), extracted_scores,q->get_strand()=='+'?0:chr_len);
+                std::get<3>(seg).ppp_score = std::get<0>(ppp_scores);
+                if(std::get<0>(ppp_scores) < global_params.ppp_minscore){
+                    ppp_pass = false;
+                }
+
+                if (!ppp_pass) {
+                    std::get<3>(seg).pass=false;
+                } // remove
+            }
+        }
+    }
+    else{
+        std::cerr<<"unknown mode selected for PPP: "<<mode_to_str(global_params.ppp_mode)<<std::endl;
+        exit(-7);
+    }
+}
 
 int  run(){
     #ifndef DEBUG
@@ -155,7 +349,10 @@ int  run(){
     transcriptome.set_cds_as_exons();
     transcriptome.remove_non_coding();
 
+    // sort again since now cds is set as exons
+    transcriptome.sort();
     rstats.template_duplicates = transcriptome.deduplicate(global_params.use_id);
+    std::cout<<"removed duplicates: "<<rstats.template_duplicates<<std::endl;
 
     std::cerr<<"loading query transcriptome"<<std::endl;
     transcriptome.add(global_params.query_fname,false,false);
@@ -177,9 +374,6 @@ int  run(){
     for(int bi=0;bi<transcriptome.bsize();bi++){ // iterate over bundles
         std::vector<Bundle>::iterator bundle_it = transcriptome.bbegin();
         bundle_it+=bi;
-//        std::cout<<"test: "<<std::endl;
-//        std::cout<<bundle_it->operator[](0)->get_tid()<<std::endl;
-//    for(auto bundle_it=transcriptome.bbegin(); bundle_it!=transcriptome.bend(); bundle_it++){ // iterate over bundles
 
         std::vector<std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>> stats; // segment,query,template,score,notes
         TX *q,*t;
@@ -187,11 +381,9 @@ int  run(){
         CHAIN segments;
 
         if(!bundle_it->has_template() || !bundle_it->has_query()){
-            // todo: still need to output into the gtf and stats
             if(global_params.stats_fp.is_open()){
                 for(int qi=0;qi<bundle_it->size();qi++) {
                     q = bundle_it->operator[](qi);
-//                    std::cout<<q->get_tid()<<std::endl;
 #ifdef DEBUG
                     if(std::strcmp(q->get_tid().c_str(),"CHS.11626.7")==0){ // rna-XM_011520617.2
                         std::cout<<"found"<<std::endl;
@@ -225,6 +417,7 @@ int  run(){
                                                << "-" << "\t"
                                                << "-" << "\t"
                                                << "-" << "\t"
+                                               << "-" << "\t"
                                                << "-" << std::endl;
                     }
                 }
@@ -236,7 +429,7 @@ int  run(){
             stats.clear();
             q=bundle_it->operator[](qi);
 #ifdef DEBUG
-            if(std::strcmp(q->get_tid().c_str(),"CHS.11626.7")==0){ // rna-XM_011520617.2
+            if(std::strcmp(q->get_tid().c_str(),"CHS.34256.1")==0){
                 std::cout<<"found"<<std::endl;
             }
 #endif
@@ -267,6 +460,7 @@ int  run(){
                                            << "-" << "\t"
                                            << "-" << "\t"
                                            << "-" << "\t"
+                                           << "-" << "\t"
                                            << "-" << std::endl;
                 }
                 continue;
@@ -278,9 +472,9 @@ int  run(){
                 t=bundle_it->operator[](ti);
                 if(!t->is_template()){continue;}
                 int intlen = q->exon_chain()->intersection(*t->cds_chain(),segments,true);
-                stats.emplace_back(std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>{});
+                stats.push_back(std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>{});
                 if(intlen==0){
-                    stats.back().emplace_back(std::make_tuple(SEGTP(),*q,*t,Score(),"no-overlap")); // empty score
+                    stats.back().push_back(std::make_tuple(SEGTP(),*q,*t,Score(),"no-overlap")); // empty score
                     std::get<3>(stats.back().back()).pass = false;
                     continue;
                 }
@@ -290,11 +484,11 @@ int  run(){
 
                 // now we need to reconstruct a transcript within the query exon chain for each segment of the template ORF
                 for(auto& s : segments){
-                    stats.back().emplace_back(std::make_tuple(s,*q,*t,Score(),"-"));
+                    stats.back().push_back(std::make_tuple(s,*q,*t,Score(),"-"));
                     // TODO: does it work without sequence avaialble?
 
 #ifdef DEBUG
-                    if(std::strcmp(q->get_tid().c_str(),"CHS.11626.7")==0){ // rna-XM_011520617.2
+                    if(std::strcmp(q->get_tid().c_str(),"CHS.34256.1")==0){ // rna-XM_011520617.2
                         std::cout<<"found"<<std::endl;
                     }
 #endif
@@ -388,44 +582,19 @@ int  run(){
                         continue;
                     }
 
-                    // otherwise - we can safely add to the curent evaluation
+                    // otherwise - we can safely add to the current evaluation
                     qseg.store_template(t);
+                    qseg.add_attribute("orfanage_status","1");
+                    qseg.add_attribute("orfanage_template_source",t->get_source());
+                    qseg.add_attribute("orfanage_template",t->get_tid());
                     std::get<1>(stats.back().back())=qseg;
                 }
-
-                // can we select a single segment to proceed with at this point?
-//                if(stats.back().size()>1 && global_params.all_gtf){
-//                    // write each complete unique segment to the GTF and exit
-//#ifdef DEBUG
-//                    std::cerr<<"found more than one valid segment"<<std::endl;
-//#endif
-//                }
                 segments.clear();
             }
 
             // check percent identity if requested
             if(global_params.percent_ident>-1) {
-                for(auto& sc : stats){
-                    for(auto& seg : sc){
-                        if(!std::get<3>(seg).pass){continue;}
-
-                        if (!std::get<1>(seg).get_template()->seq_loaded()) {std::get<1>(seg).get_template()->load_seq();} // only load sequence if not previously loaded
-                        ksw_extz_t ez;
-                        fndr->align(std::get<1>(seg).get_template()->get_aa().c_str(), std::get<1>(seg).get_aa().c_str(), ez);
-                        if (ez.n_cigar == 0) {
-                            std::get<3>(seg).pass =false;
-                        }
-                        else{
-                            int ret = fndr->parse(ez, std::get<1>(seg).get_aa(), std::get<1>(seg).get_template()->get_aa(), std::get<3>(seg));
-                            std::get<3>(seg).aln_match = std::get<3>(seg).num_aln_match();
-                            std::get<3>(seg).aln_pi = std::get<3>(seg).pi();
-                            if (ret < 0 || std::get<3>(seg).aln_pi < global_params.percent_ident) {
-                                std::get<3>(seg).pass = false;
-                            }
-                        }
-                        free(ez.cigar);
-                    }
-                }
+                run_align(stats, fndr);
             }
 
             // TODO: PPP should realistically only run if we don't find anything else
@@ -435,190 +604,129 @@ int  run(){
             //   We only need to run if no good/suitable orfanage result is available
             //   if phylocsf is requested - compute for the current qseg and add all to the current list for evaluation
             if(!global_params.ppp_track_fname.empty()){
-                if(global_params.ppp_mode==LONGEST || global_params.ppp_mode==BEST){ // todo: add to the stats
-                    std::pair<SEGTP,float> ppp_chain = transcriptome.compute_tx_cds_ppp(*q);
-
-                    TX qseg = *q;
-                    qseg.set_cds_start(std::get<0>(ppp_chain).get_start());
-                    qseg.set_cds_end(std::get<0>(ppp_chain).get_end());
-                    qseg.set_cds_phase(std::get<0>(ppp_chain).get_phase());
-                    qseg.build_cds();
-
-                    if(qseg.cds_chain()->clen()<global_params.cds_minlen){continue;}
-
-                    Score qseg_score = qseg.score(*t);
-                    qseg_score.ppp_score = std::get<1>(ppp_chain);
-                    stats.back().emplace_back(std::make_tuple(std::get<0>(ppp_chain),qseg,*t,qseg_score,"ppp"));
-                    if(qseg_score.lpd<global_params.len_perc_diff ||
-                       qseg_score.ilpd<global_params.len_frame_perc_diff ||
-                       qseg_score.mlpd<global_params.len_match_perc_diff){
-                        std::get<3>(stats.back().back()).pass = false;
-                        continue;
-                    }
-                }
-                else if(global_params.ppp_mode==VALIDATE){ // only perform validation of novel transcripts
-                    const uint64_t chr_len = transcriptome.get_chrom_len(q->get_seqid());
-                    std::array<std::vector<std::vector<float> >, 4> extracted_scores; // phase 0, phase 1, phase 2, power
-                    transcriptome.compute_PhyloCSF_for_transcript(*q, extracted_scores);(*q, extracted_scores);
-
-                    for(auto& sc : stats){
-                        for(auto& seg : sc){
-                            if(!std::get<3>(seg).pass){continue;}
-
-                            bool ppp_pass = true;
-                            std::tuple<float, float> ppp_scores = transcriptome.compute_PhyloCSF(std::get<1>(seg), extracted_scores,q->get_strand()=='+'?0:chr_len);
-                            std::get<3>(seg).ppp_score = std::get<0>(ppp_scores);
-                            if(std::get<0>(ppp_scores) < global_params.ppp_minscore){
-                                ppp_pass = false;
-                            }
-
-                            if (!ppp_pass) {
-                                std::get<3>(seg).pass=false;
-                            } // remove
-                        }
-                    }
-                }
-                else{
-                    std::cerr<<"unknown mode selected for PPP: "<<mode_to_str(global_params.ppp_mode)<<std::endl;
-                    exit(-7);
-                }
+                run_ppp(stats,transcriptome,q,t);
             }
+
+#ifdef DEBUG
+            if(std::strcmp(q->get_tid().c_str(),"CHS.34256.1")==0){ // rna-XM_011520617.2
+                std::cout<<"found"<<std::endl;
+            }
+#endif
+            // flatten out the results
+            std::map<std::pair<int,int>,std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>> stats_flat = flatten(stats); // key: cds start/end; value: segment, query, templates, score, notes
+
+            // find best CDS
+            std::pair<int,int> best_se = find_best_stat(stats_flat);
 
             std::string cur_seqid;
             transcriptome.seqid2name(q->get_seqid(),cur_seqid);
 
-            int template_comp_id = -1; // index of the best template in the list
-            int segment_comp_id = -1; // index of the best segment for the best template
-            Score best_score;
+#ifndef DEBUG
+#pragma omp critical
+#endif{
+            if(stats_flat.empty() || best_se.first<0){
+                q->add_attribute("orfanage_status","0");
+                global_params.out_gtf_fp<<q->str(cur_seqid)<<std::endl;
+                global_params.stats_fp<<q->get_tid()<<"\t"
+                                      << "-" << "\t"
+                                      << "-" << "\t"
+                                      << "-" << "\t"
+                                      << "-" << "\t"
+                                      << "-" << "\t"
+                                      << "-" << "\t"
+                                      << "-" << "\t"
+                                      << "-" << "\t"
+                                      << "-" << "\t"
+                                      << "-" << "\t"
+                                      << "-" << "\t"
+                                      << "-" << "\t"
+                                      << "-" << "\t"
+                                      << "-" << "\t"
+                                      << "-" << "\t"
+                                      << "-" << "\t"
+                                      << "-" << "\t"
+                                      << "-" <<std::endl;
+            }
+            else{
+                if(global_params.mode_array[0]==ALL){ // output all
+#ifdef DEBUG
+                    auto sfit = stats_flat.find(best_se);
+                    assert(sfit!=stats_flat.end());
+#endif
 
-            int tci = 0;
-            for(auto& t_sc : stats){
-                int sci = 0;
-                for(auto& seg : t_sc){
-                    // write stats regardless of whether it is chosen or not
-
-                    if(std::get<3>(seg).pass){
-                        // evaluate and pick the best choice based on a strategy
-                        for(auto& m : global_params.mode_array){
-                            bool found = false;
-                            switch(m){
-                                case LONGEST: // pick the longest
-                                    if(best_score.qlen < std::get<3>(seg).qlen){
-                                        template_comp_id = tci;
-                                        segment_comp_id = sci;
-                                        best_score = std::get<3>(seg);
-                                        found = true;
-                                    }
-                                    if(best_score.qlen > std::get<3>(seg).qlen){
-                                        found = true;
-                                    }
-                                    break;
-                                case LONGEST_MATCH: //
-                                    if(best_score.num_bp_inframe < std::get<3>(seg).num_bp_inframe){
-                                        template_comp_id = tci;
-                                        segment_comp_id = sci;
-                                        best_score = std::get<3>(seg);
-                                        found = true;
-                                    }
-                                    if(best_score.num_bp_inframe > std::get<3>(seg).num_bp_inframe){
-                                        found = true;
-                                    }
-                                    break;
-                                case BEST: // PI if alignment enabled - otherwise ilpd
-                                    if(global_params.percent_ident==-1){ // no alignment was being performed - use ilpd
-                                        if(best_score.ilpd < std::get<3>(seg).ilpd){
-                                            template_comp_id = tci;
-                                            segment_comp_id = sci;
-                                            best_score = std::get<3>(seg);
-                                            found = true;
-                                        }
-                                        if(best_score.ilpd > std::get<3>(seg).ilpd){
-                                            found = true;
-                                        }
-                                    }
-                                    else{
-                                        if(best_score.aln_pi < std::get<3>(seg).aln_pi){
-                                            template_comp_id = tci;
-                                            segment_comp_id = sci;
-                                            best_score = std::get<3>(seg);
-                                        }
-                                        if(best_score.aln_pi > std::get<3>(seg).aln_pi){
-                                            found = true;
-                                        }
-                                    }
-
-                                    break;
-                                default:
-                                    std::cerr<<"wrong mode selected"<<std::endl;
-                                    exit(-1);
+                    // next - iterate over each, merge duplicates and write the front
+                    for(auto& kv: stats_flat){
+                        auto& first_kv = std::get<1>(kv.second.front());
+                        if(!std::get<3>(kv.second.front()).pass){
+                            continue;
+                        }
+                        if(kv.second.size()>1){
+                            for(auto v=kv.second.begin();v!=kv.second.end();v++){
+                                first_kv.merge(std::get<2>(*v)); // merge into best
                             }
-                            if(found){ // found a better candidate - no need to search further down the mode priority array
-                                break;
-                            }
+                        }
+
+                        // assign new transcript name
+                        std::string og_tid = first_kv.get_tid();
+                        std::string new_tid = og_tid+"."+std::to_string(kv.first.first)+"-"+std::to_string(kv.first.second); // new name shall consist of the tid+start/end cds coordinates
+                        first_kv.set_tid(new_tid);
+
+                        first_kv.add_attribute("orfanage_status","1");
+                        first_kv.add_attribute("orfanage_template_source",first_kv.get_template()->get_source());
+                        first_kv.add_attribute("orfanage_template",first_kv.get_template()->get_tid());
+                        first_kv.add_attribute("orfanage_duplicity",std::to_string(first_kv.num_dups()));
+                        std::get<4>(kv.second.front()) = "gtf";
+                        if(kv.first==best_se){
+                            // even though we write ALL - mark the best one
+                            std::get<4>(kv.second.front()) = "best_gtf";
+                        }
+                        global_params.out_gtf_fp<<first_kv.str(cur_seqid)<<std::endl;
+
+                        // reset_tid
+                        first_kv.set_tid(og_tid);
+                    }
+                }
+                else{ // just output the best
+                    // merge all transcripts into the best representation
+                    auto sfit = stats_flat.find(best_se);
+#ifdef DEBUG
+                    assert(sfit!=stats_flat.end());
+#endif
+                    auto& frontq = std::get<1>(sfit->second.front());
+
+                    if(sfit->second.size()>1){
+                        for(auto v=sfit->second.begin()+1;v!=sfit->second.end();v++){
+                            frontq.merge(std::get<2>(*v)); // merge into best
                         }
                     }
 
-                    sci++;
+                    frontq.add_attribute("orfanage_status","1");
+                    frontq.add_attribute("orfanage_template_source",frontq.get_template()->get_source());
+                    frontq.add_attribute("orfanage_template",frontq.get_template()->get_tid());
+                    frontq.add_attribute("orfanage_duplicity",std::to_string(frontq.num_dups()));
+                    std::get<4>(sfit->second.front()) = "best_gtf";
+                    global_params.out_gtf_fp<<frontq.str(cur_seqid)<<std::endl;
                 }
-                tci++;
-            }
-#ifndef DEBUG
-#pragma omp critical
-#endif
-            {
-                if(template_comp_id>=0 && segment_comp_id>=0){ // found something
-                    std::get<1>(stats[template_comp_id][segment_comp_id]).add_attribute("orfanage_status","1");
-                    std::get<1>(stats[template_comp_id][segment_comp_id]).add_attribute("orfanage_template_source",std::get<1>(stats[template_comp_id][segment_comp_id]).get_template()->get_source());
-                    std::get<1>(stats[template_comp_id][segment_comp_id]).add_attribute("orfanage_template",std::get<1>(stats[template_comp_id][segment_comp_id]).get_template()->get_tid());
-                    global_params.out_gtf_fp<<std::get<1>(stats[template_comp_id][segment_comp_id]).str(cur_seqid)<<std::endl;
-                    std::get<4>(stats[template_comp_id][segment_comp_id]) = "gtf";
-                }
-                else{
-                    // nothing found - exit
-                    q->add_attribute("orfanage_status","0");
-                    global_params.out_gtf_fp<<q->str(cur_seqid)<<std::endl;
-                }
-            };
-            // TODO: need an option to write out discarded transcripts (those that overlap CDS but without a valid CDS)
+                // write stats
+                for(auto& kv : stats_flat){
+                    // assign new transcript name
+                    auto& first_kv = std::get<1>(kv.second.front());
+                    std::string tid = first_kv.get_tid();
+                    if(global_params.mode_array[0]==ALL){
+                        tid = tid+"."+std::to_string(kv.first.first)+"-"+std::to_string(kv.first.second); // new name shall consist of the tid+start/end cds coordinates
+                    }
 
-            // Lastly, write stats about each query
-#ifndef DEBUG
-#pragma omp critical
-#endif
-            {
-                if(stats.empty()){
-                    global_params.stats_fp<<q->get_tid()<<"\t"
-                                          << "-" << "\t"
-                                          << "-" << "\t"
-                                          << "-" << "\t"
-                                          << "-" << "\t"
-                                          << "-" << "\t"
-                                          << "-" << "\t"
-                                          << "-" << "\t"
-                                          << "-" << "\t"
-                                          << "-" << "\t"
-                                          << "-" << "\t"
-                                          << "-" << "\t"
-                                          << "-" << "\t"
-                                          << "-" << "\t"
-                                          << "-" << "\t"
-                                          << "-" << "\t"
-                                          << "-" << "\t"
-                                          << "-" <<std::endl;
-                }
-                else{
-                    for(auto& grp : stats){
-                        for(auto& seg : grp){
-                            global_params.stats_fp<<std::get<1>(seg).get_tid()<<"\t" // query
-                                                  <<std::get<2>(seg).get_tid()<<"\t" // template
-                                                  <<std::get<0>(seg)<<"\t" // segment
-                                                  <<std::get<4>(seg)<<"\t" // notes
-                                                  <<std::get<3>(seg)<<std::endl; // score
-                        }
+                    for(auto& v : kv.second){ // for every segment
+                        global_params.stats_fp<<tid<<"\t" // query
+                                              <<std::get<2>(v).get_tid()<<"\t" // template
+                                              <<std::get<0>(v)<<"\t" // segment
+                                              <<std::get<4>(v)<<"\t" // notes
+                                              <<std::get<1>(v).num_dups()+1<<"\t" // number of duplciates represented by the current ORF
+                                              <<std::get<3>(v)<<std::endl; // score
                     }
                 }
             }
-        }
+        };
     }
 
     return 0;
@@ -638,7 +746,7 @@ int main(int argc, char** argv) {
     args.add_option("ilpd",ArgParse::Type::INT,"Percent difference by length of bases in frame of the reference transcript. If -1 (default) is set - the check will not be performed.",ArgParse::Level::GENERAL,false);
     args.add_option("mlpd",ArgParse::Type::INT,"Percent difference by length of bases that are in both query and reference. If -1 (default) is set - the check will not be performed.",ArgParse::Level::GENERAL,false);
     args.add_option("minlen",ArgParse::Type::INT,"Minimum length of an open reading frame to consider for the analysis",ArgParse::Level::GENERAL,false);
-    args.add_option("mode", ArgParse::Type::STRING, "Which CDS to report: LONGEST, LONGEST_MATCH, BEST. Default: " + mode_to_str(global_params.mode_array.front()), ArgParse::Level::GENERAL, false);
+    args.add_option("mode", ArgParse::Type::STRING, "Which CDS to report: ALL, LONGEST, LONGEST_MATCH, BEST. Default: " + mode_to_str(global_params.mode_array.front()), ArgParse::Level::GENERAL, false);
     args.add_option("stats",ArgParse::Type::STRING,"Output a separate file with stats for each query/template pair",ArgParse::Level::GENERAL,false);
     args.add_option("threads",ArgParse::Type::INT,"Number of threads to run in parallel",ArgParse::Level::GENERAL,false);
     args.add_option("use_id",ArgParse::Type::FLAG,"If enabled, only transcripts with the same gene ID from the query file will be used to form a bundle. In this mode the same template transcript may be used in several bundles, if overlaps transcripts with different gene_ids.",ArgParse::Level::GENERAL,false);
@@ -651,10 +759,10 @@ int main(int argc, char** argv) {
     args.add_option("gape",ArgParse::Type::INT,"Gap-extension penalty", ArgParse::Level::GENERAL,false);
 
     // PhyloCSF++
-    args.add_option("ppp_mode", ArgParse::Type::STRING, "Which CDS to report: LONGEST, BEST. Default: " + mode_to_str(global_params.ppp_mode), ArgParse::Level::GENERAL, false);
-    args.add_option("min-score", ArgParse::Type::FLOAT, "Only consider ORFs with a minimum weighted PhyloCSF mean score (range from -15 to +15, >0 more likely to be protein-coding). Default: " + std::to_string(global_params.ppp_minscore), ArgParse::Level::GENERAL, false);
-    args.add_option("min-codons", ArgParse::Type::INT, "Only consider ORFs with a minimum codon length. Default: " + std::to_string(global_params.ppp_mincodons), ArgParse::Level::GENERAL, false);
-    args.add_option("tracks", ArgParse::Type::STRING, "Path to the bigWig file PhyloCSF+1.bw (expects the other 5 frames to be in the same directory, optionally the power track).",ArgParse::Level::GENERAL, false);
+    args.add_option("ppp_mode", ArgParse::Type::STRING, "[EXPERIMENTAL]: Which CDS to report: LONGEST, BEST. Default: " + mode_to_str(global_params.ppp_mode), ArgParse::Level::GENERAL, false);
+    args.add_option("min-score", ArgParse::Type::FLOAT, "[EXPERIMENTAL]: Only consider ORFs with a minimum weighted PhyloCSF mean score (range from -15 to +15, >0 more likely to be protein-coding). Default: " + std::to_string(global_params.ppp_minscore), ArgParse::Level::GENERAL, false);
+    args.add_option("min-codons", ArgParse::Type::INT, "[EXPERIMENTAL]: Only consider ORFs with a minimum codon length. Default: " + std::to_string(global_params.ppp_mincodons), ArgParse::Level::GENERAL, false);
+    args.add_option("tracks", ArgParse::Type::STRING, "[EXPERIMENTAL]: Path to the bigWig file PhyloCSF+1.bw (expects the other 5 frames to be in the same directory, optionally the power track).",ArgParse::Level::GENERAL, false);
 
     args.add_positional_argument("templates", ArgParse::Type::STRING, "One or more GFF/GTF files with coding exons to be used as templates.", true, true);
 
@@ -762,6 +870,12 @@ int main(int argc, char** argv) {
             global_params.mode_array.push_back(LONGEST_MATCH);
             global_params.mode_array.push_back(BEST);
         }
+        else if (mode == "ALL"){
+            global_params.mode_array.push_back(ALL);
+            global_params.mode_array.push_back(LONGEST_MATCH);
+            global_params.mode_array.push_back(BEST);
+            global_params.mode_array.push_back(LONGEST);
+        }
         else if (mode == "LONGEST_MATCH") {
             global_params.mode_array.push_back(LONGEST_MATCH);
             global_params.mode_array.push_back(BEST);
@@ -773,7 +887,7 @@ int main(int argc, char** argv) {
             global_params.mode_array.push_back(LONGEST);
         }
         else{
-            printf(OUT_ERROR "Please choose a valid mode (LONGEST, LONGEST_MATCH, BEST)!\n" OUT_RESET);
+            printf(OUT_ERROR "Please choose a valid mode (ALL, LONGEST, LONGEST_MATCH, BEST)!\n" OUT_RESET);
             return -1;
         }
     }
@@ -839,6 +953,7 @@ int main(int argc, char** argv) {
                                 "template_id\t"
                                 "segment\t"
                                 "notes\t"
+                                "num_templates\t"
                                 <<s.stats_header()<<std::endl;
     }
 
