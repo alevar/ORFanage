@@ -76,7 +76,7 @@ struct Parameters{
     int len_frame_perc_diff = -1; // percent difference by length of bases in frame of the reference transcript. If -1 (default) is set - the check will not be performed.
     int len_match_perc_diff = -1; // percent difference by length of bases that are in both query and reference. If -1 (default) is set - the check will not be performed.
     int cds_minlen = -1; // minimum length
-    std::vector<find_mode_t> mode_array{ALL,LONGEST_MATCH,BEST,LONGEST}; // priority order of modes // TODO: we could also add new mode - match start-end
+    std::vector<find_mode_t> mode_array{LONGEST_MATCH,BEST,LONGEST,ALL}; // priority order of modes // TODO: we could also add new mode - match start-end
     int num_threads = 1;
 
     // Alignment
