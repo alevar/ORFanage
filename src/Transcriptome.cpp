@@ -445,6 +445,9 @@ void TX::set_cds_phase(int start_phase){
     this->cds_phase=start_phase;
     this->cds.assign_phase(this->strand,0);
 }
+void TX::remove_seq(){
+    this->seq.clear();
+}
 void TX::load_seq(){
     this->seq.clear();
     std::string nt_seq;
@@ -709,6 +712,20 @@ int Transcriptome::seqid2name(int seqid,std::string& seqid_name){
     }
     return 0;
 }
+
+GFaSeqGet* Transcriptome::get_fasta_seq(int seqid){
+    if(this->check_ref){
+        if(seqid!=this->loaded_seqid){
+            std::string seqid_name;
+            int res = this->seqid2name(seqid,seqid_name);
+            assert(res==0);
+            this->loaded_seq = fastaSeqGet(gfasta, seqid_name.c_str());
+            this->loaded_seqid = seqid;
+        }
+    }
+    return this->loaded_seq;
+}
+
 uint Transcriptome::bundleup(bool use_id){ // create bundles and return the total number of bundles
     this->sort(use_id);
     this->bundles.clear();
@@ -819,32 +836,35 @@ uint Transcriptome::clean_cds(bool rescue){
 // if requested - also removes transcripts with the same CDS chains
 // transcript IDs are merged into the parenting transcript
 // if requested - comparisons are only made between transcripts with the same geneID
+bool unique_tx_cmp_with_id(TX& t1, TX& t2){
+    if(t1.get_geneID() != t2.get_geneID()){
+        return false;
+    }
+    if(t1==t2){
+        t1.merge(t2);
+        return true;
+    }
+    return false;
+}
+bool unique_tx_cmp(TX& t1, TX& t2){
+    if(t1==t2){
+        t1.merge(t2);
+        return true;
+    }
+    return false;
+}
 uint Transcriptome::deduplicate(bool use_id){
     // first deduplicate based on transcripts
 
     uint old_transcriptome_size = this->tx_vec.size();
 
-    auto it = this->tx_vec.begin();
-    it++; // move to the second element since the first will always be retained
-    auto prev_it = this->tx_vec.begin();
-    while(it != this->tx_vec.end()) {
-        if(use_id){
-           if(it->get_geneID() != prev_it->get_geneID()){
-               prev_it = it;
-               it++;
-               continue;
-           }
-        }
-
-        if(*it==*prev_it){ // duplicates - need remove
-            // deduplicate
-            it->merge(*prev_it);
-            it = this->tx_vec.erase(it);
-            continue;
-        }
-
-        prev_it = it;
-        it++;
+    if(use_id){
+        auto last = std::unique( this->tx_vec.begin(), this->tx_vec.end(), unique_tx_cmp_with_id);
+        this->tx_vec.erase( last, this->tx_vec.end() );
+    }
+    else{
+        auto last = std::unique( this->tx_vec.begin(), this->tx_vec.end(), unique_tx_cmp);
+        this->tx_vec.erase( last, this->tx_vec.end() );
     }
 
     return old_transcriptome_size - this->tx_vec.size();

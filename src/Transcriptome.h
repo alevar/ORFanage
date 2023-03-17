@@ -636,6 +636,7 @@ public:
     uint inframe_len(TX* t);
     void extend_to_start(TX* t,bool allow_non_aug=false);
     int rescue_cds(bool allow_non_aug=false,TX* t=nullptr);
+    void remove_seq();
     void load_seq();
     bool seq_loaded(){return !this->seq.empty();}
     uint aa_len(){return this->seq.empty() ? this->cds_alen() : this->seq.cds_aa_len();}
@@ -843,6 +844,7 @@ public:
     bool can_add(TX* t,bool use_id=false) const;
     bool add_tx(TX* t,bool use_id=false);
     void load_seq(GFaSeqGet* seq);
+    void clear_seq(){bundle_seq.clear();}
 
     bool has_template() const;
     bool has_query() const;
@@ -913,6 +915,7 @@ public:
         }
     }
     int seqid2name(int seqid,std::string& seqid_name);
+    GFaSeqGet* get_fasta_seq(int seqid);
     uint bundleup(bool use_id=false); // create bundles and return the total number of bundles
     void build_cds_chains();
     uint clean_short_orfs(int minlen);
@@ -956,6 +959,8 @@ private:
 
     std::string ref_fa_fname;
     bool check_ref = false;
+    int loaded_seqid = INT_MIN;
+    GFaSeqGet* loaded_seq = nullptr;
 
     std::vector<std::string> seqid_names;
     std::map<std::string,int> seqnames_ids;

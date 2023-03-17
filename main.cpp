@@ -307,7 +307,7 @@ void run_ppp(std::vector<std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>>
 }
 
 int  run(){
-    #ifndef DEBUG
+    #ifdef DEBUG
         std::cout<<"Running in DEBUG"<<std::endl;
     #endif
     // load the reference GFF
@@ -351,10 +351,12 @@ int  run(){
 
     // sort again since now cds is set as exons
     transcriptome.sort();
+
+    std::cerr<<"start removing duplicates"<<std::endl;
     rstats.template_duplicates = transcriptome.deduplicate(global_params.use_id);
-    std::cout<<"removed duplicates: "<<rstats.template_duplicates<<std::endl;
 
     std::cerr<<"loading query transcriptome"<<std::endl;
+
     transcriptome.add(global_params.query_fname,false,false);
 
     if(!global_params.ppp_track_fname.empty()){
@@ -374,12 +376,9 @@ int  run(){
     for(int bi=0;bi<transcriptome.bsize();bi++){ // iterate over bundles
         std::vector<Bundle>::iterator bundle_it = transcriptome.bbegin();
         bundle_it+=bi;
-
-        std::vector<std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>> stats; // segment,query,template,score,notes
         TX *q,*t;
-        Finder* fndr = global_params.percent_ident>-1 ? transcriptome.get_aligner() : nullptr;
-        CHAIN segments;
 
+        // REFERENCELESS BUNDLE
         if(!bundle_it->has_template() || !bundle_it->has_query()){
             if(global_params.stats_fp.is_open()){
                 for(int qi=0;qi<bundle_it->size();qi++) {
@@ -424,6 +423,12 @@ int  run(){
             }
             continue;
         }
+
+        // MAIN LOOP
+
+        std::vector<std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>> stats; // segment,query,template,score,notes
+        Finder* fndr = global_params.percent_ident>-1 ? transcriptome.get_aligner() : nullptr;
+        CHAIN segments;
 
         for(int qi=0;qi<bundle_it->size();qi++){
             stats.clear();
@@ -623,7 +628,7 @@ int  run(){
 
 #ifndef DEBUG
 #pragma omp critical
-#endif{
+#endif
             if(stats_flat.empty() || best_se.first<0){
                 q->add_attribute("orfanage_status","0");
                 global_params.out_gtf_fp<<q->str(cur_seqid)<<std::endl;
