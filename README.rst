@@ -1,9 +1,17 @@
 ORFanage: Ultra-efficient and sensitive method to search for ORFs in spliced genomes guided by reference annotation to maximize protein similarity within genes.
 ================================================================================================
 
+.. image:: https://readthedocs.org/projects/orfan/badge/?version=latest
+	:target: http://orfan.readthedocs.org/en/latest
+	:alt: Documentation Status
+
 .. image:: https://img.shields.io/badge/License-GPLv3-blue.svg
     :target: https://opensource.org/licenses/GPL-3.0
     :alt: GPLv3 License
+    
+.. image:: https://img.shields.io/github/v/tag/alevar/orfan?style=flat-square
+	:target: https://img.shields.io/github/v/tag/alevar/orfan?style=flat-square
+	:alt: GitHub tag (latest SemVer)
 
 .. contents::
     :local:
@@ -18,7 +26,15 @@ identify cases of known ORFs fitting the query transcript both with and without 
 introduced by additional exons, alternative start and end sites, etc. ORFanage is also designed
 to quantify any changes to the reference annotation which are introduced by the splice variation.
 
-Varabyou, A., Erdogdu, B., Pockrandt, C., Rincon, N., Salzberg, S. L., & Pertea, M. (2022). **ORFanage: Ultra-efficient and sensitive method to search for ORFs in spliced genomes guided by reference annotation to maximize protein similarity within genes.**. `...`, ...
+Publications
+^^^^^^^^^^^^
+
+Varabyou, A., Erdogdu, B., Salzberg, S. L., & Pertea, M. (2023). `Investigating Open Reading Frames in Known and Novel Transcripts using ORFanage <https://www.biorxiv.org/content/10.1101/2023.03.23.533704v1>`_. bioRxiv, 2023-03.
+
+Documentation
+^^^^^^^^^^^^
+
+A much more comprehensive documentation for ORFanage is provided on `ReadTheDocs <http://orfan.readthedocs.org/en/latest>`_! Please check it out to see examples workflows, some interesting results and more.
 
 Installation
 ^^^^^^^^^^^^
@@ -41,22 +57,21 @@ By default make install will likely require administrative privileges. To specif
 
 If you are using a very old version of Git (< 1.6.5) the flag --recursive does not exist. In this case you need to clone the submodule separately (git submodule update --init --recursive).
 
-**Requirements**
 
-Operating System
-GNU/Linux
+.. list-table:: **Requirements**
+   :widths: 15 35
 
-Architecture
-Intel/AMD platforms that support ``POPCNT``
+   * - Operating System
+     - GNU/Linux
+   * - Architecture
+     - Intel/AMD platforms that support POPCNT
+   * - Compiler
+     - GCC ≥ 4.9, Clang ≥ 3.8
+   * - Build system
+     - CMake ≥ 3.2
+   * - Language support
+     - C++14
 
-Compiler
-GCC ≥ 4.9, Clang ≥ 3.8
-
-Build system
-CMake ≥ 3.2
-
-Language support
-C++14
 
 Getting started
 ^^^^^^^^^^^^^^^

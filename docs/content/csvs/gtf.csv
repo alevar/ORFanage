@@ -1,0 +1,4 @@
+SeqID,Source,Type,Start,End,Score,Strand,Phase,Attributes
+chr3,BestRefSeq,transcript,139577792,139583319,.,+,.,transcript_id "rna-NR_121609.1"; gene_id "gene-COPB2-DT"; gene_name "COPB2-DT";
+chr3,BestRefSeq,exon,139577792,139577850,.,+,.,transcript_id "rna-NR_121609.1";
+chr3,BestRefSeq,CDS,139577792,139577850,.,+,.,transcript_id "rna-NR_121609.1";
