@@ -1,0 +1,16 @@
+chr19	MANE	transcript	35666517	35678481	.	+	.	transcript_id "CHS.26495.8"; gene_id "CHS.26495"; gene_name "UPK1A"; gene_type "protein_coding"; db_xref "RefSeq:NM_007000.4,GENCODE:ENST00000222275.3"; max_TPM "1591"; sample_count "850"; assembly_id "ALL_12018152"; tag "MANE_Select"; original_source "havana"; CDStopAdjusted "true"
+chr19	MANE	exon	35666517	35666538	.	+	.	transcript_id "CHS.26495.8"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	MANE	exon	35666809	35666896	.	+	.	transcript_id "CHS.26495.8"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	MANE	exon	35668454	35668654	.	+	.	transcript_id "CHS.26495.8"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	MANE	exon	35673232	35673306	.	+	.	transcript_id "CHS.26495.8"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	MANE	exon	35673438	35673545	.	+	.	transcript_id "CHS.26495.8"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	MANE	exon	35675840	35676019	.	+	.	transcript_id "CHS.26495.8"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	MANE	exon	35677812	35677895	.	+	.	transcript_id "CHS.26495.8"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	MANE	exon	35677975	35678481	.	+	.	transcript_id "CHS.26495.8"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	MANE	CDS	35666813	35666896	.	+	0	transcript_id "CHS.26495.8"
+chr19	MANE	CDS	35668454	35668654	.	+	0	transcript_id "CHS.26495.8"
+chr19	MANE	CDS	35673232	35673306	.	+	0	transcript_id "CHS.26495.8"
+chr19	MANE	CDS	35673438	35673545	.	+	0	transcript_id "CHS.26495.8"
+chr19	MANE	CDS	35675840	35676019	.	+	0	transcript_id "CHS.26495.8"
+chr19	MANE	CDS	35677812	35677895	.	+	0	transcript_id "CHS.26495.8"
+chr19	MANE	CDS	35677975	35678019	.	+	0	transcript_id "CHS.26495.8"

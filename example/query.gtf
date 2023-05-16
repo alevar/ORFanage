@@ -1,0 +1,41 @@
+chr19	CHESS	transcript	35666516	35678481	.	+	.	transcript_id "CHS.26495.3"; gene_id "CHS.26495"; gene_name "UPK1A"; gene_type "protein_coding"; max_TPM "16"; sample_count "38"; assembly_id "ALL_12682468"; original_source "StringTie"
+chr19	CHESS	exon	35666516	35666538	.	+	.	transcript_id "CHS.26495.3"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	CHESS	exon	35666809	35666896	.	+	.	transcript_id "CHS.26495.3"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	CHESS	exon	35668454	35668654	.	+	.	transcript_id "CHS.26495.3"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	CHESS	exon	35673232	35673306	.	+	.	transcript_id "CHS.26495.3"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	CHESS	exon	35673438	35673545	.	+	.	transcript_id "CHS.26495.3"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	CHESS	exon	35675840	35676019	.	+	.	transcript_id "CHS.26495.3"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	CHESS	exon	35677812	35677895	.	+	.	transcript_id "CHS.26495.3"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	CHESS	exon	35678027	35678481	.	+	.	transcript_id "CHS.26495.3"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	CHESS	transcript	35666517	35678481	.	+	.	transcript_id "CHS.26495.2"; gene_id "CHS.26495"; gene_name "UPK1A"; gene_type "protein_coding"; max_TPM "40"; sample_count "116"; assembly_id "ALL_12733254"; original_source "StringTie"
+chr19	CHESS	exon	35666517	35666538	.	+	.	transcript_id "CHS.26495.2"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	CHESS	exon	35668454	35668654	.	+	.	transcript_id "CHS.26495.2"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	CHESS	exon	35673232	35673306	.	+	.	transcript_id "CHS.26495.2"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	CHESS	exon	35673438	35673545	.	+	.	transcript_id "CHS.26495.2"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	CHESS	exon	35675840	35676019	.	+	.	transcript_id "CHS.26495.2"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	CHESS	exon	35677812	35677895	.	+	.	transcript_id "CHS.26495.2"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	CHESS	exon	35677975	35678481	.	+	.	transcript_id "CHS.26495.2"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	RefSeq	transcript	35666517	35678481	.	+	.	transcript_id "CHS.26495.7"; gene_id "CHS.26495"; gene_name "UPK1A"; gene_type "protein_coding"; db_xref "RefSeq:NM_001281443.2"; max_TPM "303"; sample_count "614"; assembly_id "ALL_12018153"; original_source "BestRefSeq"; CDStopAdjusted "true"
+chr19	RefSeq	exon	35666517	35666538	.	+	.	transcript_id "CHS.26495.7"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	RefSeq	exon	35666809	35666896	.	+	.	transcript_id "CHS.26495.7"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	RefSeq	exon	35668454	35668654	.	+	.	transcript_id "CHS.26495.7"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	RefSeq	exon	35673232	35673306	.	+	.	transcript_id "CHS.26495.7"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	RefSeq	exon	35673438	35673545	.	+	.	transcript_id "CHS.26495.7"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	RefSeq	exon	35675840	35676019	.	+	.	transcript_id "CHS.26495.7"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	RefSeq	exon	35676236	35676333	.	+	.	transcript_id "CHS.26495.7"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	RefSeq	exon	35677812	35677895	.	+	.	transcript_id "CHS.26495.7"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	RefSeq	exon	35677975	35678481	.	+	.	transcript_id "CHS.26495.7"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	MANE	transcript	35666517	35678481	.	+	.	transcript_id "CHS.26495.8"; gene_id "CHS.26495"; gene_name "UPK1A"; gene_type "protein_coding"; db_xref "RefSeq:NM_007000.4,GENCODE:ENST00000222275.3"; max_TPM "1591"; sample_count "850"; assembly_id "ALL_12018152"; tag "MANE_Select"; original_source "havana"; CDStopAdjusted "true"
+chr19	MANE	exon	35666517	35666538	.	+	.	transcript_id "CHS.26495.8"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	MANE	exon	35666809	35666896	.	+	.	transcript_id "CHS.26495.8"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	MANE	exon	35668454	35668654	.	+	.	transcript_id "CHS.26495.8"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	MANE	exon	35673232	35673306	.	+	.	transcript_id "CHS.26495.8"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	MANE	exon	35673438	35673545	.	+	.	transcript_id "CHS.26495.8"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	MANE	exon	35675840	35676019	.	+	.	transcript_id "CHS.26495.8"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	MANE	exon	35677812	35677895	.	+	.	transcript_id "CHS.26495.8"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	MANE	exon	35677975	35678481	.	+	.	transcript_id "CHS.26495.8"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	CHESS	transcript	35673610	35678481	.	+	.	transcript_id "CHS.26495.16"; gene_id "CHS.26495"; gene_name "UPK1A"; gene_type "protein_coding"; max_TPM "4.1"; sample_count "120"; assembly_id "ALL_12018176"; original_source "StringTie"
+chr19	CHESS	exon	35673610	35673756	.	+	.	transcript_id "CHS.26495.16"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	CHESS	exon	35675840	35676019	.	+	.	transcript_id "CHS.26495.16"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	CHESS	exon	35677812	35677895	.	+	.	transcript_id "CHS.26495.16"; gene_id "CHS.26495"; gene_name "UPK1A";
+chr19	CHESS	exon	35677975	35678481	.	+	.	transcript_id "CHS.26495.16"; gene_id "CHS.26495"; gene_name "UPK1A";
