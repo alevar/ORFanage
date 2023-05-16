@@ -153,5 +153,4 @@ Data
 Sample datasets are provided in the "example" directory to test and get familiar with ORFanage.
 The included examples can be run with the following base commands:
 
-1. orfanage --reference <path/to/grch38.fa> --output <path/to/output/directory/>test000001.gtf --query example/refseq.test000001.gtf <--additional arguments> --stats <path/to/output/directory/>test000001.stats example/mane.test000001.gtf
-2. orfanage --reference <path/to/grch38.fa> --output <path/to/output/directory/>test000002.gtf --query example/refseq.test000002.gtf <--additional arguments> --stats <path/to/output/directory/>test000002.stats example/mane.test000002.gtf
+1. orfanage --reference <path/to/grch38.fa> --output example/output.gtf --query example/query.gtf <--additional arguments> --stats example/stats.tsv example/template.gtf
