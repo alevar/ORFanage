@@ -27,8 +27,9 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 html_theme = 'alabaster'
 html_static_path = ['_static']
 
+html_logo = './logo.png'
+
 html_theme_options = {
-    "logo": "logo.png",
     "logo_text_align": "center",
     "description": "Logo designed by Julia Wang",
     "github_user": "alevar",
