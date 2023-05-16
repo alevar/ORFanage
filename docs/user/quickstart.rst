@@ -201,7 +201,7 @@ yet is sufficient to evaluate homology between any mismatching segments of the q
  	To compute ILPI, our method first computes the total number of positions in an ORF that are in the same frame as the reference, 
  	thus coding for the same codons, which determines the In-frame Length (IL). 
  	Then ILPI is computed as the fraction of IL of the total length of the reference coding sequence. 
- 	As illustrated in Figure 1e, the correlation between ILPI and percent identity computed via the Smith-Waterman algorithm is very high.
+ 	As illustrated in the figure below, the correlation between ILPI and percent identity computed via the Smith-Waterman algorithm is very high.
  	
  	Here illustrated is the the high correlation between ILPI and %Identity
  	

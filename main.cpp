@@ -20,6 +20,7 @@
 #include "Transcriptome.h"
 
 enum find_mode_t{
+    START_MATCH, // if an ORF with a mathcing start codon is available - report it
     ALL, // report all complete orfs
     LONGEST, // longest complete orf;
     LONGEST_MATCH, // default (highest number of inframe bases shared above thresholds) - if alignment specified - will be decided by alignment instead;
@@ -30,6 +31,9 @@ enum find_mode_t{
 std::string mode_to_str(const find_mode_t mode) noexcept{
     std::string mode_str;
     switch (mode){
+        case START_MATCH:
+            mode_str = "MATCH_START";
+            break;
         case ALL:
             mode_str = "ALL";
             break;
@@ -76,7 +80,7 @@ struct Parameters{
     int len_frame_perc_diff = -1; // percent difference by length of bases in frame of the reference transcript. If -1 (default) is set - the check will not be performed.
     int len_match_perc_diff = -1; // percent difference by length of bases that are in both query and reference. If -1 (default) is set - the check will not be performed.
     int cds_minlen = -1; // minimum length
-    std::vector<find_mode_t> mode_array{LONGEST_MATCH,BEST,LONGEST,ALL}; // priority order of modes // TODO: we could also add new mode - match start-end
+    std::vector<find_mode_t> mode_array{LONGEST_MATCH,BEST,START_MATCH,LONGEST,ALL}; // priority order of modes
     int num_threads = 1;
 
     // Alignment
@@ -120,6 +124,11 @@ bool score_lt(const Score& lhs, const Score& rhs){
     }
     for(auto& m : global_params.mode_array){
         switch(m){
+            case START_MATCH:
+                if(lhs.start_match != rhs.start_match){
+                    return lhs.start_match < rhs.start_match; // return true if left start does not match
+                }
+                break;
             case ALL: // skip - only relevant later
                 break;
             case LONGEST: // pick the longest
@@ -158,6 +167,11 @@ bool score_gt(const Score& lhs, const Score& rhs){
     }
     for(auto& m : global_params.mode_array){
         switch(m){
+            case START_MATCH:
+                if(lhs.start_match != rhs.start_match){
+                    return lhs.start_match > rhs.start_match; // return true if left start does match
+                }
+                break;
             case ALL: // skip - only relevant later
                 break;
             case LONGEST: // pick the longest
@@ -417,6 +431,8 @@ int  run(){
                                                << "-" << "\t"
                                                << "-" << "\t"
                                                << "-" << "\t"
+                                               << "-" << "\t"
+                                               << "-" << "\t"
                                                << "-" << std::endl;
                     }
                 }
@@ -452,6 +468,8 @@ int  run(){
                                            << "-" << "\t"
                                            << "-" << "\t"
                                            << "keep_cds" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
                                            << "-" << "\t"
                                            << "-" << "\t"
                                            << "-" << "\t"
@@ -650,6 +668,8 @@ int  run(){
                                       << "-" << "\t"
                                       << "-" << "\t"
                                       << "-" << "\t"
+                                      << "-" << "\t"
+                                      << "-" << "\t"
                                       << "-" <<std::endl;
             }
             else{
@@ -751,12 +771,12 @@ int main(int argc, char** argv) {
     args.add_option("ilpd",ArgParse::Type::INT,"Percent difference by length of bases in frame of the reference transcript. If -1 (default) is set - the check will not be performed.",ArgParse::Level::GENERAL,false);
     args.add_option("mlpd",ArgParse::Type::INT,"Percent difference by length of bases that are in both query and reference. If -1 (default) is set - the check will not be performed.",ArgParse::Level::GENERAL,false);
     args.add_option("minlen",ArgParse::Type::INT,"Minimum length of an open reading frame to consider for the analysis",ArgParse::Level::GENERAL,false);
-    args.add_option("mode", ArgParse::Type::STRING, "Which CDS to report: ALL, LONGEST, LONGEST_MATCH, BEST. Default: " + mode_to_str(global_params.mode_array.front()), ArgParse::Level::GENERAL, false);
+    args.add_option("mode", ArgParse::Type::STRING, "Which CDS to report: ALL, LONGEST, LONGEST_MATCH, BEST, START_MATCH. Default: " + mode_to_str(global_params.mode_array.front()), ArgParse::Level::GENERAL, false);
     args.add_option("stats",ArgParse::Type::STRING,"Output a separate file with stats for each query/template pair",ArgParse::Level::GENERAL,false);
     args.add_option("threads",ArgParse::Type::INT,"Number of threads to run in parallel",ArgParse::Level::GENERAL,false);
     args.add_option("use_id",ArgParse::Type::FLAG,"If enabled, only transcripts with the same gene ID from the query file will be used to form a bundle. In this mode the same template transcript may be used in several bundles, if overlaps transcripts with different gene_ids.",ArgParse::Level::GENERAL,false);
     args.add_option("non_aug",ArgParse::Type::FLAG,"If enabled, non-AUG start codons in reference transcripts will not be discarded and will be considered in overlapping query transcripts on equal grounds with the AUG start codon.",ArgParse::Level::GENERAL,false);
-    args.add_option("keep_cds",ArgParse::Type::FLAG,"If enabled, any CDS already presernt in the query will be kept unmodified.",ArgParse::Level::GENERAL,false);
+    args.add_option("keep_cds",ArgParse::Type::FLAG,"If enabled, any CDS already present in the query will be kept unmodified.",ArgParse::Level::GENERAL,false);
 
     // Alignment
     args.add_option("pi",ArgParse::Type::INT,"Percent identity between the query and template sequences. This option requires --reference parameter to be set. If enabled - will run alignment between passing pairs.", ArgParse::Level::GENERAL,false);
@@ -874,25 +894,35 @@ int main(int argc, char** argv) {
             global_params.mode_array.push_back(LONGEST);
             global_params.mode_array.push_back(LONGEST_MATCH);
             global_params.mode_array.push_back(BEST);
+            global_params.mode_array.push_back(START_MATCH);
+        }
+        else if (mode == "START_MATCH") {
+            global_params.mode_array.push_back(START_MATCH);
+            global_params.mode_array.push_back(LONGEST);
+            global_params.mode_array.push_back(LONGEST_MATCH);
+            global_params.mode_array.push_back(BEST);
         }
         else if (mode == "ALL"){
             global_params.mode_array.push_back(ALL);
             global_params.mode_array.push_back(LONGEST_MATCH);
             global_params.mode_array.push_back(BEST);
             global_params.mode_array.push_back(LONGEST);
+            global_params.mode_array.push_back(START_MATCH);
         }
         else if (mode == "LONGEST_MATCH") {
             global_params.mode_array.push_back(LONGEST_MATCH);
             global_params.mode_array.push_back(BEST);
+            global_params.mode_array.push_back(START_MATCH);
             global_params.mode_array.push_back(LONGEST);
         }
         else if (mode == "BEST") {
             global_params.mode_array.push_back(BEST);
             global_params.mode_array.push_back(LONGEST_MATCH);
+            global_params.mode_array.push_back(START_MATCH);
             global_params.mode_array.push_back(LONGEST);
         }
         else{
-            printf(OUT_ERROR "Please choose a valid mode (ALL, LONGEST, LONGEST_MATCH, BEST)!\n" OUT_RESET);
+            printf(OUT_ERROR "Please choose a valid mode (START_MATCH, ALL, LONGEST, LONGEST_MATCH, BEST)!\n" OUT_RESET);
             return -1;
         }
     }

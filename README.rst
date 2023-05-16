@@ -13,7 +13,7 @@
     :alt: GPLv3 License
     
 .. image:: https://img.shields.io/github/v/tag/alevar/orfanage?style=flat-square
-	:target: https://img.shields.io/github/v/tag/alevar/orfanage?style=flat-square
+	: [#sashimi]_target: https://img.shields.io/github/v/tag/alevar/orfanage?style=flat-square
 	:alt: GitHub tag (latest SemVer)
 
 .. contents::

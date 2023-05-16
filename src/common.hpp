@@ -34,6 +34,9 @@ struct Score{
     int qlen = 0;
     int tlen = 0;
 
+    bool start_match = 0;
+    bool stop_match = 0;
+
     int num_bp_extra = 0;
     int num_bp_missing = 0;
     int num_bp_match = 0;
@@ -85,6 +88,8 @@ struct Score{
                            "match_length_pd\t"
                            "inframe_length_pd\t"
                            "alignment_match\t"
+                           "start_match\t"
+                           "stop_match\t"
                            "pi\t"
                            "ppp_score";
         return res;
@@ -102,6 +107,8 @@ struct Score{
            << s.mlpd << "\t"
            << s.ilpd << "\t"
            << s.aln_match << "\t"
+           << s.start_match << "\t"
+           << s.stop_match << "\t"
            << s.aln_pi << "\t"
            << s.ppp_score;
 
