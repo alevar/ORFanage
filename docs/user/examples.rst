@@ -3,6 +3,21 @@
 Examples
 ======================
 
-In this section let's try running **ORFan** on some example data provided in the repository.
+This section will introduce a sample workflow to annotate ORFs in a simple locus using **ORFanage**.
+For the sake of keeping this example concise and illustrative, the data is constrained to a single locus and a subset of isoforms all included in the CHESS dataset [#chess]_.
 
-orfanage --reference <path/to/grch38.fa> --output <path/to/output/directory/>test000002.gtf --query example/refseq.test000002.gtf <--additional arguments> --stats <path/to/output/directory/>test000002.stats example/mane.test000002.gtf
+create standardized gtf for input
+
+run orfanage
+
+visualize gtf [#sashimi]_
+
+take a closer look through the stats file
+
+
+
+References
+--------------
+
+.. [#chess] `CHESS 3: an improved, comprehensive catalog of human genes and transcripts based on large-scale expression data, phylogenetic analysis, and protein structure <https://www.biorxiv.org/content/10.1101/2022.12.21.521274v1>`__. 
+.. [#sashimi] `Sashimi plots <https://github.com/alevar/tiebrush>`__. 

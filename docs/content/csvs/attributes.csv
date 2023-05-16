@@ -1,2 +1,4 @@
-transcript_id,gene_id,orfanage_status,orfanage_template,orfanage_source
-rna-NM_001363968.1,gene-NMNAT3,1,ENST00000643695.2,havana
+transcript_id,rna-NM_001363968.1,Unique Transcript Identifier
+gene_id,gene-NMNAT3,Unique Gene Identifier
+orfanage_status,1,Flag set if ORFanage was able to find an ORF. Possible values are 0 and 1
+orfanage_template,ENST00000643695.2,transcript_id of the reference transcript used to find the best ORF

@@ -1,0 +1,9 @@
+SeqID,chr3,Chromosome ID
+Source,BestRefSeq,Source of the annotation
+Type,transcript,Type of the record. Possible values are: transcript/exon/CDS
+Start,139577792,Start coordinate of the record
+End,139583319,End coordinate of the record
+Score,.,Unused by ORFanage
+Strand,+,Strand of the record
+Phase,.,Value sets the number of bases that need to be trimmed off the start of the CDS record to reach th estart of the next codon. Value is only available in CDS records. Possible values are: 0/1/2
+Attributes,transcript_id "rna-NR_121609.1,Field containing extended descriptors of each record

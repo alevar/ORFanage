@@ -1,13 +1,13 @@
 .. _install:
 
-Installation of ORF-an
+Installation
 ========================
 
 
 Using Pre-Built Binaries
 -------------------------------
 
-Several pre-compiled binaries are pre-built for every release of ORFan to make it easy to use with no additional installation requirements.
+Several pre-compiled binaries are pre-built for every release of **ORFanage** to make it easy to use with no additional installation requirements.
 
 Latest stable binary release can be obtained using the following command
 

@@ -1,8 +1,11 @@
 ORFanage: Ultra-efficient and sensitive method to search for ORFs in spliced genomes guided by reference annotation to maximize protein similarity within genes.
 ================================================================================================
 
+.. |logo| image:: docs/logo.png
+   :width: 10%
+
 .. image:: https://readthedocs.org/projects/orfan/badge/?version=latest
-	:target: http://orfan.readthedocs.org/en/latest
+	:target: http://orfanage.readthedocs.org/en/latest
 	:alt: Documentation Status
 
 .. image:: https://img.shields.io/badge/License-GPLv3-blue.svg
@@ -10,7 +13,7 @@ ORFanage: Ultra-efficient and sensitive method to search for ORFs in spliced gen
     :alt: GPLv3 License
     
 .. image:: https://img.shields.io/github/v/tag/alevar/orfan?style=flat-square
-	:target: https://img.shields.io/github/v/tag/alevar/orfan?style=flat-square
+	:target: https://img.shields.io/github/v/tag/alevar/orfanage?style=flat-square
 	:alt: GitHub tag (latest SemVer)
 
 .. contents::
@@ -25,6 +28,7 @@ GTF file based on evidence from one or more reference annotaitons. The method is
 identify cases of known ORFs fitting the query transcript both with and without modifications,
 introduced by additional exons, alternative start and end sites, etc. ORFanage is also designed
 to quantify any changes to the reference annotation which are introduced by the splice variation.
+
 
 Publications
 ^^^^^^^^^^^^

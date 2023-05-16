@@ -6,7 +6,7 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'ORFan'
+project = 'ORFanage'
 copyright = '2023, Ales Varabyou'
 author = 'Ales Varabyou'
 release = '1.0'
@@ -25,4 +25,14 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = 'alabaster'
-html_static_path = ['_static']
+#html_static_path = ['_static']
+#
+html_theme_options = {
+    "logo": "./logo.png",
+    "logo_text_align": "center",
+    "description": "Logo designed by Julia Wang",
+    "github_user": "alevar",
+    "github_repo": "ORFanage",
+    "travis_button": False,  # Circle now
+    "codecov_button": False  # README badge now
+}
