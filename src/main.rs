@@ -1,12 +1,14 @@
 mod segtp;
+mod treader;
 
 use std::error::Error;
-use clap::{Command, Arg};
+use clap::{Command, Arg, ArgMatches};
 use std::path::Path;
 
-fn run() -> Result<(),Box<dyn Error>>{
-    let mut s1 = segtp::SEGTP::new(11,10)?;
-    let mut s2 = segtp::SEGTP::default();
+fn run(matches :ArgMatches) -> Result<(),Box<dyn Error>>{
+
+    let mut s1 = segtp::Segment::new(11, 10)?;
+    let mut s2 = segtp::Segment::default();
 
     Ok(())
 }
@@ -19,13 +21,23 @@ fn main() -> Result<(), Box<dyn Error>>{
     check_path(query_fname)?;
 
     let trail: Vec<_> = matches.get_many::<String>("templates").unwrap().collect();
-    for tmpl_fname in trail{
-        check_path(tmpl_fname)?;
+    for i in 0..trail.len(){
+        check_path(trail[i])?;
     }
 
     let output_fname = matches.get_one::<String>("output").unwrap();
 
-    run()?;
+    let mut tr = treader::TReader::new(&trail);
+    tr.add(query_fname);
+
+    for grp in tr{
+        for g in grp{
+            print!("{},",g);
+        }
+        println!("");
+    }
+
+    run(matches)?;
 
     Ok(())
 }
@@ -105,27 +117,27 @@ fn build_cli() -> clap::ArgMatches{
                 .action(clap::ArgAction::SetTrue),
         )
         .arg(
-            Arg::new("lpd")
-                .long("lpd")
-                .help("Percent difference by length between the original and reference transcripts. \
+            Arg::new("lpi")
+                .long("lpi")
+                .help("Percent identity by length between the original and reference transcripts. \
                       If -1 (default) is set - the check will not be performed.")
                 .required(false)
                 .default_value("0")
                 .value_parser(clap::value_parser!(u16).range(0..100)),
         )
         .arg(
-            Arg::new("ilpd")
-                .long("ilpd")
-                .help("Percent difference by length of bases in frame of the reference transcript. \
+            Arg::new("ilpi")
+                .long("ilpi")
+                .help("Percent identity by length of bases in frame of the reference transcript. \
                        If -1 (default) is set - the check will not be performed.")
                 .required(false)
                 .default_value("0")
                 .value_parser(clap::value_parser!(u16).range(0..100)),
         )
         .arg(
-            Arg::new("mlpd")
-                .long("mlpd")
-                .help("Percent difference by length of bases that are in both query and reference. \
+            Arg::new("mlpi")
+                .long("mlpi")
+                .help("Percent identity by length of bases that are in both query and reference. \
                        If -1 (default) is set - the check will not be performed.")
                 .required(false)
                 .default_value("0")
