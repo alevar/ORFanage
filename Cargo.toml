@@ -7,6 +7,8 @@ edition = "2021"
 
 [dependencies]
 clap = "4.1.6"
+noodles-gtf = "0.10.0"
+noodles-gff = "0.12.0"
 
 [[bin]]
 name = "ORFanage_rust"

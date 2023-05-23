@@ -1,6 +1,44 @@
+use std::arch::x86_64::_mm_sha1nexte_epu32;
 use std::fs::File;
 use std::error::Error;
 use std::io::{BufRead, BufReader, Read};
+use std::str::FromStr;
+use noodles_gtf as gtf;
+use noodles_gff as gff;
+use noodles_gff::Line;
+use crate::transcript::Transcript;
+
+pub(crate) struct GTFReader {
+    fname: String,
+    reader: gtf::Reader<BufReader<File>>,
+    next_record: gtf::Record,
+}
+
+impl GTFReader {
+    pub fn new<S>(fname: S) -> Result<Self, Box<dyn Error>> where S: Into<String>{
+        let filename = fname.into();
+        let reader = File::open(filename.clone()).map(BufReader::new).map(gtf::Reader::new)?;
+        Ok(GTFReader{fname:filename.clone(),
+                     reader:reader,
+                     next_record:gtf::Record::default()})
+    }
+}
+
+impl Iterator for GTFReader {
+    type Item = Transcript;
+    fn next(&mut self) -> Option<Self::Item>{ // load the next transcript (everything associated with it)
+        let mut transcript = Transcript::default();
+        let mut line = String::new();
+        loop{
+            let res = self.reader.read_line(&mut line);
+            if res.is_ok() {
+                if let Ok(gtf::Line::Record(rec)) = gtf::Line::from_str(line.as_ref()) {
+                    transcript.add(rec);
+                }
+            }
+        }
+    }
+}
 
 // should be able to take either gtf or a vector of gtf files
 #[derive(Default)]
@@ -9,6 +47,11 @@ pub(crate) struct TReader {
     readers: Vec<BufReader<File>>,
     current_txs : Vec<Option<u32>>,
 }
+
+// TODO:
+//  can yield one-by-one
+//  can yield by loci overlap
+//  can yield by geneid
 
 impl TReader {
     pub fn new<A>(args: A) -> TReader

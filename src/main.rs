@@ -1,14 +1,33 @@
-mod segtp;
+mod segment;
 mod treader;
+mod transcript;
 
 use std::error::Error;
 use clap::{Command, Arg, ArgMatches};
 use std::path::Path;
 
+
+use std::fs::File;
+use std::io::{self,BufReader};
+use noodles_gtf as gtf;
+use noodles_gff as gff;
+use crate::treader::GTFReader;
+
 fn run(matches :ArgMatches) -> Result<(),Box<dyn Error>>{
 
-    let mut s1 = segtp::Segment::new(11, 10)?;
-    let mut s2 = segtp::Segment::default();
+    let mut reader = File::open("/home/sparrow/genomicTools/ORFanage_rust/example/template.gtf").map(BufReader::new).map(gtf::Reader::new)?;
+
+    let mut i=0;
+    for result in reader.records() {
+        let record = result?;
+        println!("{i}\t{record}");
+        i+=1;
+    }
+
+    let gtfreader = GTFReader::new("/home/sparrow/genomicTools/ORFanage_rust/example/template.gtf");
+
+    let mut s1 = segment::Segment::new(11, 10)?;
+    let mut s2 = segment::Segment::default();
 
     Ok(())
 }
@@ -53,7 +72,7 @@ fn check_path(path_fname: &str) -> Result<(),Box<dyn Error>>{
     }
 }
 
-fn build_cli() -> clap::ArgMatches{
+fn build_cli() -> ArgMatches{
     Command::new("ORFanage")
         .version("1.0")
         .author("Ales Varabyou <ales.varabyou[at]jhu[dot]edu>")
