@@ -470,6 +470,8 @@ Score TX::score(TX& t) {
     Score s;
     s.qlen = this->cds_len();
     s.tlen = t.cds_len();
+    CHAIN union_chain;\
+    s.ulen = this->cds.get_union(t.cds,union_chain);
 
     // 1. compute the total number of matching positions between query and template
     // 2. compute the number of matching positions in frame between query and template
@@ -509,10 +511,10 @@ Score TX::score(TX& t) {
         std::for_each(mod_chain.rbegin(), mod_chain.rend(), extract_mods);
     }
 
-    // compute lpd, ilpd, mlpd, etc
-    s.lpd = 100.0 * ((float) s.qlen / (float) s.tlen);
-    s.ilpd = 100.0 * ((float) s.num_bp_inframe / (float) s.tlen);
-    s.mlpd = 100.0 * ((float) s.num_bp_match / (float) s.tlen);
+    // compute lpi, ilpi, mlpi, etc
+    s.lpi = 100.0 * ((float) s.qlen / (float) s.ulen);
+    s.ilpi = 100.0 * ((float) s.num_bp_inframe / (float) s.ulen);
+    s.mlpi = 100.0 * ((float) s.num_bp_match / (float) s.ulen);
 
     return s;
 }

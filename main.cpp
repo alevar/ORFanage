@@ -57,9 +57,9 @@ std::string mode_to_str(const find_mode_t mode) noexcept{
 }
 
 struct DEFAULTS{
-    int len_perc_diff = -1; // percent difference by length between the original and reference transcripts. If -1 (default) is set - the check will not be performed.
-    int len_frame_perc_diff = -1; // percent difference by length of bases in frame of the reference transcript. If -1 (default) is set - the check will not be performed.
-    int len_match_perc_diff = -1; // percent difference by length of bases that are in both query and reference. If -1 (default) is set - the check will not be performed.
+    int len_perc_ident = -1; // percent identity by length between the original and reference transcripts. If -1 (default) is set - the check will not be performed.
+    int len_frame_perc_ident = -1; // percent identity by length of bases in frame of the reference transcript. If -1 (default) is set - the check will not be performed.
+    int len_match_perc_ident = -1; // percent identity by length of bases that are in both query and reference. If -1 (default) is set - the check will not be performed.
     int cds_minlen = -1; // minimum length
     int num_threads = 1;
 
@@ -76,9 +76,9 @@ struct Parameters{
     bool clean_query = false;
     bool clean_templ = false;
     bool rescue = false;
-    int len_perc_diff = -1; // percent difference by length between the original and reference transcripts. If -1 (default) is set - the check will not be performed.
-    int len_frame_perc_diff = -1; // percent difference by length of bases in frame of the reference transcript. If -1 (default) is set - the check will not be performed.
-    int len_match_perc_diff = -1; // percent difference by length of bases that are in both query and reference. If -1 (default) is set - the check will not be performed.
+    int len_perc_ident = -1; // percent identity by length between the original and reference transcripts. If -1 (default) is set - the check will not be performed.
+    int len_frame_perc_ident = -1; // percent identity by length of bases in frame of the reference transcript. If -1 (default) is set - the check will not be performed.
+    int len_match_perc_ident = -1; // percent identity by length of bases that are in both query and reference. If -1 (default) is set - the check will not be performed.
     int cds_minlen = -1; // minimum length
     std::vector<find_mode_t> mode_array{LONGEST_MATCH,BEST,START_MATCH,LONGEST,ALL}; // priority order of modes
     int num_threads = 1;
@@ -141,10 +141,10 @@ bool score_lt(const Score& lhs, const Score& rhs){
                     return lhs.num_bp_inframe < rhs.num_bp_inframe;
                 }
                 break;
-            case BEST: // PI if alignment enabled - otherwise ilpd
-                if(global_params.percent_ident==-1){ // no alignment was being performed - use ilpd
-                    if(lhs.ilpd != rhs.ilpd){
-                        return lhs.ilpd < rhs.ilpd;
+            case BEST: // PI if alignment enabled - otherwise ilpi
+                if(global_params.percent_ident==-1){ // no alignment was being performed - use ilpi
+                    if(lhs.ilpi != rhs.ilpi){
+                        return lhs.ilpi < rhs.ilpi;
                     }
                 }
                 else{
@@ -184,10 +184,10 @@ bool score_gt(const Score& lhs, const Score& rhs){
                     return lhs.num_bp_inframe > rhs.num_bp_inframe;
                 }
                 break;
-            case BEST: // PI if alignment enabled - otherwise ilpd
-                if(global_params.percent_ident==-1){ // no alignment was being performed - use ilpd
-                    if(lhs.ilpd != rhs.ilpd){
-                        return lhs.ilpd > rhs.ilpd;
+            case BEST: // PI if alignment enabled - otherwise ilpi
+                if(global_params.percent_ident==-1){ // no alignment was being performed - use ilpi
+                    if(lhs.ilpi != rhs.ilpi){
+                        return lhs.ilpi > rhs.ilpi;
                     }
                 }
                 else{
@@ -285,9 +285,9 @@ void run_ppp(std::vector<std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>>
         Score qseg_score = qseg.score(*t);
         qseg_score.ppp_score = std::get<1>(ppp_chain);
         stats.back().push_back(std::make_tuple(std::get<0>(ppp_chain),qseg,*t,qseg_score,"ppp"));
-        if(qseg_score.lpd<global_params.len_perc_diff ||
-           qseg_score.ilpd<global_params.len_frame_perc_diff ||
-           qseg_score.mlpd<global_params.len_match_perc_diff){
+        if(qseg_score.lpi<global_params.len_perc_ident ||
+           qseg_score.ilpi<global_params.len_frame_perc_ident ||
+           qseg_score.mlpi<global_params.len_match_perc_ident){
             std::get<3>(stats.back().back()).pass = false;
             return;
         }
@@ -591,9 +591,9 @@ int  run(){
 
                     Score qseg_score = qseg.score(*t);
                     std::get<3>(stats.back().back())=qseg_score;
-                    if(qseg_score.lpd<global_params.len_perc_diff ||
-                       qseg_score.ilpd<global_params.len_frame_perc_diff ||
-                       qseg_score.mlpd<global_params.len_match_perc_diff){
+                    if(qseg_score.lpi<global_params.len_perc_ident ||
+                       qseg_score.ilpi<global_params.len_frame_perc_ident ||
+                       qseg_score.mlpi<global_params.len_match_perc_ident){
                         std::get<3>(stats.back().back()).pass = false;
                         continue;
                     }
@@ -757,19 +757,24 @@ int  run(){
     return 0;
 }
 
+// TODO:
+//   - ILPI currently divides by the length of the template. Incorrect. Suppose query is 10bp and reference is 5.
+//     and suppose all of query matches the reference - this will return 100% ilpi which is incorrect.
+//     Instead should be divided by matches+mismatches = 10
+
 int main(int argc, char** argv) {
     ArgParse args("orfanage",
                   "Annotating Open Reading Frames based on reference, phylogeny and sequence similarity.");
 
     args.add_option("query",ArgParse::Type::STRING, "Path to a GTF query file with transcripts to which CDSs are to be ported", ArgParse::Level::GENERAL,true);
     args.add_option("output", ArgParse::Type::STRING, "Basename for all output files generated by this software", ArgParse::Level::GENERAL,true);
-    args.add_option("reference",ArgParse::Type::STRING,"Path to the reference genome file in FASTA format. This parameter is required when the following parameters are used: 1. cleanq; 2. cleant; 3. pd.",ArgParse::Level::GENERAL,false);
+    args.add_option("reference",ArgParse::Type::STRING,"Path to the reference genome file in FASTA format. This parameter is required when the following parameters are used: 1. cleanq; 2. cleant; 3. pi.",ArgParse::Level::GENERAL,false);
     args.add_option("cleanq",ArgParse::Type::FLAG,"If enabled - will ensure all transcripts in the output file will have a valid start and end codons. This option requires the use of --reference parameter",ArgParse::Level::GENERAL,false);
     args.add_option("cleant",ArgParse::Type::FLAG,"If enabled - will ensure all ORFs in the reference annotations start with a valid start codon and end with the first available stop codon. This option requires the use of --reference parameter",ArgParse::Level::GENERAL,false);
     args.add_option("rescue",ArgParse::Type::FLAG,"If enabled - will attempt rescuing the broken ORFs in the reference annotations. This option requires the use of --reference parameter",ArgParse::Level::GENERAL,false);
-    args.add_option("lpd",ArgParse::Type::INT,"Percent difference by length between the original and reference transcripts. If -1 (default) is set - the check will not be performed.",ArgParse::Level::GENERAL,false);
-    args.add_option("ilpd",ArgParse::Type::INT,"Percent difference by length of bases in frame of the reference transcript. If -1 (default) is set - the check will not be performed.",ArgParse::Level::GENERAL,false);
-    args.add_option("mlpd",ArgParse::Type::INT,"Percent difference by length of bases that are in both query and reference. If -1 (default) is set - the check will not be performed.",ArgParse::Level::GENERAL,false);
+    args.add_option("lpi",ArgParse::Type::INT,"Percent identity by length between the original and reference transcripts. If -1 (default) is set - the check will not be performed.",ArgParse::Level::GENERAL,false);
+    args.add_option("ilpi",ArgParse::Type::INT,"Percent identity by length of bases in frame of the reference transcript. If -1 (default) is set - the check will not be performed.",ArgParse::Level::GENERAL,false);
+    args.add_option("mlpi",ArgParse::Type::INT,"Percent identity by length of bases that are in both query and reference. If -1 (default) is set - the check will not be performed.",ArgParse::Level::GENERAL,false);
     args.add_option("minlen",ArgParse::Type::INT,"Minimum length of an open reading frame to consider for the analysis",ArgParse::Level::GENERAL,false);
     args.add_option("mode", ArgParse::Type::STRING, "Which CDS to report: ALL, LONGEST, LONGEST_MATCH, BEST, START_MATCH. Default: " + mode_to_str(global_params.mode_array.front()), ArgParse::Level::GENERAL, false);
     args.add_option("stats",ArgParse::Type::STRING,"Output a separate file with stats for each query/template pair",ArgParse::Level::GENERAL,false);
@@ -952,9 +957,9 @@ int main(int argc, char** argv) {
     }
 
     global_params.cds_minlen = args.is_set("minlen") ? args.get_int("minlen") : def_params.cds_minlen;
-    global_params.len_perc_diff = args.is_set("lpd") ? args.get_int("lpd") : def_params.len_perc_diff;
-    global_params.len_frame_perc_diff = args.is_set("ilpd") ? args.get_int("ilpd") : def_params.len_frame_perc_diff;
-    global_params.len_match_perc_diff = args.is_set("mlpd") ? args.get_int("mlpd") : def_params.len_match_perc_diff;
+    global_params.len_perc_ident = args.is_set("lpi") ? args.get_int("lpi") : def_params.len_perc_ident;
+    global_params.len_frame_perc_ident = args.is_set("ilpi") ? args.get_int("ilpi") : def_params.len_frame_perc_ident;
+    global_params.len_match_perc_ident = args.is_set("mlpi") ? args.get_int("mlpi") : def_params.len_match_perc_ident;
     global_params.percent_ident = args.is_set("pi") ? args.get_int("pi") : def_params.percent_ident;
 
     global_params.gapo = args.is_set("gapo") ? args.get_int("gapo") : def_params.gapo;

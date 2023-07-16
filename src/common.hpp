@@ -33,6 +33,7 @@ struct Score{
     // general stats which can be computed from the simplest interval comparison
     int qlen = 0;
     int tlen = 0;
+    int ulen = 0; // length of the union of query and tempalte chains
 
     bool start_match = 0;
     bool stop_match = 0;
@@ -51,9 +52,9 @@ struct Score{
     int aln_match = 0;
 
     // summary based on interval arithmetic
-    float lpd = 0.0; // percent difference by length between the original and reference transcripts.
-    float ilpd = 0.0; // percent difference by length of bases in frame of the reference transcript.
-    float mlpd = 0.0; // percent difference by length of bases that are in both query and reference.
+    float lpi = 0.0; // percent identity by length between the original and reference transcripts.
+    float ilpi = 0.0; // percent identity by length of bases in frame of the reference transcript.
+    float mlpi = 0.0; // percent identity by length of bases that are in both query and reference.
     float aln_pi = 0.0; // percent identity
 
     // PhyloCSF++
@@ -73,20 +74,21 @@ struct Score{
     };
     float pi(){ // compute percent identity
         // compute number of matching bases
-        return 100.0*((float)this->num_aln_match()/((float)this->tlen/3.0));
+        return 100.0*((float)this->num_aln_match()/((float)this->ulen/3.0));
     };
     std::string stats_header(){
         std::string res =  "query_len\t"
                            "template_len\t"
+                           "union_len\t"
                            "pass\t"
                            "len_match\t"
                            "len_inframe\t"
                            "len_outframe\t"
                            "len_extra\t"
                            "len_missing\t"
-                           "length_pd\t"
-                           "match_length_pd\t"
-                           "inframe_length_pd\t"
+                           "length_pi\t"
+                           "match_length_pi\t"
+                           "inframe_length_pi\t"
                            "alignment_match\t"
                            "start_match\t"
                            "stop_match\t"
@@ -97,15 +99,16 @@ struct Score{
     friend std::ostream& operator<<(std::ostream& os, const Score& s){
         os << s.qlen << "\t"
            << s.tlen << "\t"
+           << s.ulen << "\t"
            << s.pass << "\t"
            << s.num_bp_match << "\t"
            << s.num_bp_inframe << "\t"
            << s.num_bp_outframe << "\t"
            << s.num_bp_extra << "\t"
            << s.num_bp_missing << "\t"
-           << s.lpd << "\t"
-           << s.mlpd << "\t"
-           << s.ilpd << "\t"
+           << s.lpi << "\t"
+           << s.mlpi << "\t"
+           << s.ilpi << "\t"
            << s.aln_match << "\t"
            << s.start_match << "\t"
            << s.stop_match << "\t"

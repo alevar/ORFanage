@@ -140,6 +140,13 @@ public:
     int unite(SEGTP& s2){
         return this->get_union(s2,*this);
     }
+
+    bool overlaps(SEGTP& s2){
+        if (this->end < s2.start || s2.end < this->start) {
+            return false;
+        }
+    }
+
     bool operator== (const SEGTP& s) const{
         if(this->start!=s.start){
             return false;
@@ -272,6 +279,36 @@ public:
         }
         this->chain = tmp;
         return this->clen();
+    }
+
+    int get_union(CHAIN& chain2,CHAIN& res){
+        // computes union between two chains
+        // returns the length of the union
+
+        int i=0,j=0;
+        while(i<this->chain.size() && j<chain2.size()){
+            SEGTP c1 = this->chain[i];
+            SEGTP c2 = chain2[j];
+
+            if (c1.get_end() < c2.get_start()) {
+                res.push_back(c1);
+                i++;
+            }
+            else if (c2.get_end() < c1.get_start()) {
+                res.push_back(c2);
+                j++;
+            }
+            else {
+                int is = std::min(c1.get_start(),c2.get_start());
+                int ie = std::max(c1.get_end(),c2.get_end());
+                SEGTP union_seg;
+                int union_len = c1.get_union(c2,union_seg);
+                res.push_back(union_seg);
+                i++;
+                j++;
+            }
+        }
+        return res.clen();
     }
 
     int intersection(CHAIN& c2,CHAIN& res,bool segments=false){
