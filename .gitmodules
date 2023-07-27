@@ -4,3 +4,6 @@
 [submodule "include/gclib"]
 	path = include/gclib
 	url = https://github.com/gpertea/gclib.git
+[submodule "include/ksw2"]
+	path = include/ksw2
+	url = https://github.com/lh3/ksw2
