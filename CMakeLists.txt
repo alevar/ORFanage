@@ -67,15 +67,15 @@ ExternalProject_Add(libBigWig
         GIT_REPOSITORY "https://github.com/alevar/libBigWig"
         UPDATE_COMMAND ""
         DOWNLOAD_DIR "${CMAKE_SOURCE_DIR}/include/"
-        SOURCE_DIR "${CMAKE_SOURCE_DIR}/include/libBigWig"
+	SOURCE_DIR "${CMAKE_BINARY_DIR}/libBigWig"
         BUILD_IN_SOURCE 1
         CONFIGURE_COMMAND ""
         BUILD_COMMAND "${LIBBIGWIG_MAKE_CMD}"
         INSTALL_COMMAND ""
         )
 
-include_directories(${CMAKE_SOURCE_DIR}/include/libBigWig)
-link_directories(${CMAKE_SOURCE_DIR}/include/libBigWig)
+include_directories(SYSTEM ${CMAKE_BINARY_DIR}/libBigWig)
+link_directories(${CMAKE_BINARY_DIR}/libBigWig)
 
 # KLIB
 FetchContent_Declare(klib
@@ -133,10 +133,7 @@ add_executable(orfanage
 
 add_dependencies(orfanage libBigWig)
 
-if (APPLE AND ORFANAGE_STATIC_BUILD)
-    target_link_libraries(orfanage ${CMAKE_SOURCE_DIR}/include/libBigWig/libBigWig.a z)
-else ()
-    target_link_libraries(orfanage ${CMAKE_SOURCE_DIR}/include/libBigWig/libBigWig.a z)
-endif ()
+target_link_libraries(orfanage z)
+target_link_libraries(orfanage BigWig)
 
 install(TARGETS orfanage DESTINATION ${CMAKE_INSTALL_PREFIX})
