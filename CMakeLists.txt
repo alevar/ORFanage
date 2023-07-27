@@ -102,6 +102,8 @@ include_directories("${CMAKE_SOURCE_DIR}/include/")
 #         ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2.h
 # )
 
+configure_file(${CMAKE_SOURCE_DIR}/include/ksw2/ksw2_extz2_sse.c ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2_extz2_sse.cpp COPYONLY)
+
 add_library(ksw2 STATIC
         ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2.h
         ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2_extz2_sse.cpp
