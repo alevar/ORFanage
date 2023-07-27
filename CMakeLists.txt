@@ -67,7 +67,7 @@ ExternalProject_Add(libBigWig
         GIT_REPOSITORY "https://github.com/alevar/libBigWig"
         UPDATE_COMMAND ""
         DOWNLOAD_DIR "${CMAKE_SOURCE_DIR}/include/"
-	SOURCE_DIR "${CMAKE_BINARY_DIR}/libBigWig"
+	    SOURCE_DIR "${CMAKE_BINARY_DIR}/libBigWig"
         BUILD_IN_SOURCE 1
         CONFIGURE_COMMAND ""
         BUILD_COMMAND "${LIBBIGWIG_MAKE_CMD}"
@@ -78,16 +78,35 @@ include_directories(SYSTEM ${CMAKE_BINARY_DIR}/libBigWig)
 link_directories(${CMAKE_BINARY_DIR}/libBigWig)
 
 # KLIB
-FetchContent_Declare(klib
-        GIT_REPOSITORY https://github.com/lh3/ksw2.git
-        )
-FetchContent_MakeAvailable(klib)
-message(STATUS "klib source dir: ${klib_SOURCE_DIR}")
-message(STATUS "klib binary dir: ${klib_BINARY_DIR}")
-include_directories(${klib_SOURCE_DIR})
+include_directories("${CMAKE_SOURCE_DIR}/include/ksw2/")
 
 # GCLIB
 include_directories("${CMAKE_SOURCE_DIR}/include/")
+
+
+# Add the ksw2 source files
+# add_library(ksw2 STATIC
+#         ${CMAKE_SOURCE_DIR}/include/ksw2/cli.c
+#         ${CMAKE_SOURCE_DIR}/include/ksw2/kalloc.c
+#         ${CMAKE_SOURCE_DIR}/include/ksw2/kalloc.h
+#         ${CMAKE_SOURCE_DIR}/include/ksw2/kseq.h
+#         ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2_extd2_sse.c
+#         ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2_extd.c
+#         ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2_extf2_sse.c
+#         ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2_exts2_sse.c
+#         ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2_extz2_sse.c
+#         ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2_extz.c
+#         ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2_gg2.c
+#         ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2_gg2_sse.c
+#         ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2_gg.c
+#         ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2.h
+# )
+
+add_library(ksw2 STATIC
+        ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2.h
+        ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2_extz2_sse.cpp
+)
+set_target_properties(ksw2 PROPERTIES LINKER_LANGUAGE CXX)
 
 
 add_executable(orfanage
@@ -117,11 +136,6 @@ add_executable(orfanage
         ${CMAKE_SOURCE_DIR}/src/common.hpp
         ${CMAKE_SOURCE_DIR}/src/gff_utils.h
         ${CMAKE_SOURCE_DIR}/src/gff_utils.cpp
-        ${klib_SOURCE_DIR}/ksw2.h
-        ${klib_SOURCE_DIR}/ksw2_extz2_sse.c
-        ${klib_SOURCE_DIR}/ksw2_extz.c
-        ${klib_SOURCE_DIR}/ksw2_gg2_sse.c
-        ${klib_SOURCE_DIR}/ksw2_gg.c
         ${CMAKE_SOURCE_DIR}/src/aln.hpp
         ${CMAKE_SOURCE_DIR}/main.cpp)
 
@@ -130,6 +144,9 @@ add_executable(orfanage
 #elseif(CMAKE_BUILD_TYPE MATCHES Release)
 #    target_compile_definitions(orfanage PUBLIC DEBUG=0)
 #endif()
+
+include_directories(ksw2)
+target_link_libraries(orfanage ksw2)
 
 add_dependencies(orfanage libBigWig)
 

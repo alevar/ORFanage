@@ -12,6 +12,8 @@
 #include <gff_utils.h>
 #include <unordered_set>
 
+#include "ksw2.h"
+
 #ifndef DEBUG
     #include <omp.h>
 #endif
