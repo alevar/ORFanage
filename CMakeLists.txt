@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.2)
-project(orfanage)
+project(orfanage CXX)
 
 include(ExternalProject)
 include(FetchContent)
@@ -136,4 +136,4 @@ add_dependencies(orfanage libBigWig)
 target_link_libraries(orfanage z)
 target_link_libraries(orfanage BigWig)
 
-install(TARGETS orfanage DESTINATION ${CMAKE_INSTALL_PREFIX})
+install(TARGETS orfanage DESTINATION bin)
