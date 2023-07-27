@@ -27,6 +27,7 @@ endif()
 
 include_directories(src)
 
+set(LIBBIGWIG_MAKE_CMD "make")
 option(ORFANAGE_BUILD_LIBBIGWIG "Turn on/off building step of libBigWig (used for bioconda)." ON)
 if (NOT ORFANAGE_BUILD_LIBBIGWIG)
     add_definitions(-DORFANAGE_BUILD_LIBBIGWIG=0)
@@ -70,7 +71,7 @@ ExternalProject_Add(libBigWig
 	    SOURCE_DIR "${CMAKE_BINARY_DIR}/libBigWig"
         BUILD_IN_SOURCE 1
         CONFIGURE_COMMAND ""
-        BUILD_COMMAND "${LIBBIGWIG_MAKE_CMD}"
+        BUILD_COMMAND "make"
         INSTALL_COMMAND ""
         )
 
