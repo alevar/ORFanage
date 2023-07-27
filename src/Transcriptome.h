@@ -927,8 +927,6 @@ public:
     void set_ref(const std::string& rff);
     void use_non_aug();
     void load_seqids(GffReader& gffReader);
-    void set_ppp(std::string& track_name,std::string mode, int mincodons, float minscore){this->ppp_track_fname=track_name;this->ppp_mode=mode;this->ppp_mincodons=mincodons;this->ppp_minscore=minscore;}
-    void load_ppptracks();
     void add(const std::string& gtf_fname,bool is_templ,bool coding_only);
     void sort(bool use_id=false){
         if(use_id) {
@@ -962,7 +960,6 @@ public:
     void remove_non_coding();
     void correct_chain_len();
     int size(){return this->tx_vec.size();}
-    const uint64_t get_chrom_len(int seqid){return this->chrom_sizes[seqid];}
 
     void set_aligner(const int8_t *mat,const int8_t *alphabet,int gapo,int gape);
     Finder* get_aligner(){return &aligner;}
@@ -986,10 +983,6 @@ public:
     int bsize(){return this->bundles.size();}
 
 
-    // PhyloCSF++
-    std::pair<SEGTP,float> compute_tx_cds_ppp(TX& tx);
-    void compute_PhyloCSF_for_transcript(TX& t, std::array<std::vector<std::vector<float> >, 4> & extracted_scores);
-    std::tuple<float, float> compute_PhyloCSF(TX& tx,const std::array<std::vector<std::vector<float> >, 4> & extracted_scores, const uint32_t chrLen);
 private:
     std::vector<TX> tx_vec;
     std::vector<Bundle> bundles;
@@ -1002,15 +995,6 @@ private:
     std::vector<std::string> seqid_names;
     std::map<std::string,int> seqnames_ids;
     std::pair<std::map<std::string,int>::iterator,bool> n2i_it;
-
-    // Required with PhyloCSF
-    std::string ppp_track_fname;
-    std::string ppp_mode;
-    int ppp_mincodons;
-    float ppp_minscore;
-    bigWigFile_t *bw_files[7] = { NULL }; // in this order: +1, +2, +3, -1, -2, -3, power/confidence
-    std::vector<uint64_t> chrom_sizes; // index is the chromosome ID
-    const chromList_t *chr_list;
 
     // Alignment
     Finder aligner;

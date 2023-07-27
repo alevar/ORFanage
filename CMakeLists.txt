@@ -27,16 +27,6 @@ endif()
 
 include_directories(src)
 
-set(LIBBIGWIG_MAKE_CMD "make")
-option(ORFANAGE_BUILD_LIBBIGWIG "Turn on/off building step of libBigWig (used for bioconda)." ON)
-if (NOT ORFANAGE_BUILD_LIBBIGWIG)
-    add_definitions(-DORFANAGE_BUILD_LIBBIGWIG=0)
-    set(LIBBIGWIG_MAKE_CMD "")
-else ()
-    add_definitions(-DORFANAGE_BUILD_LIBBIGWIG=1)
-    set(LIBBIGWIG_MAKE_CMD "make")
-endif ()
-
 option(ORFANAGE_NATIVE_BUILD "Architecture-specific optimizations, i.e., g++ -march=native." OFF)
 if (ORFANAGE_NATIVE_BUILD)
     add_definitions(-DORFANAGE_NATIVE_BUILD=1)
@@ -63,20 +53,6 @@ if (ORFANAGE_STATIC_BUILD)
     #     set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
     # endif ()
 endif ()
-
-ExternalProject_Add(libBigWig
-        GIT_REPOSITORY "https://github.com/alevar/libBigWig"
-        UPDATE_COMMAND ""
-        DOWNLOAD_DIR "${CMAKE_SOURCE_DIR}/include/"
-	    SOURCE_DIR "${CMAKE_BINARY_DIR}/libBigWig"
-        BUILD_IN_SOURCE 1
-        CONFIGURE_COMMAND ""
-        BUILD_COMMAND "make"
-        INSTALL_COMMAND ""
-        )
-
-include_directories(SYSTEM ${CMAKE_BINARY_DIR}/libBigWig)
-link_directories(${CMAKE_BINARY_DIR}/libBigWig)
 
 # KLIB
 include_directories("${CMAKE_SOURCE_DIR}/include/ksw2/")
@@ -151,9 +127,6 @@ add_executable(orfanage
 include_directories(ksw2)
 target_link_libraries(orfanage ksw2)
 
-add_dependencies(orfanage libBigWig)
-
 target_link_libraries(orfanage z)
-target_link_libraries(orfanage BigWig)
 
 install(TARGETS orfanage DESTINATION bin)

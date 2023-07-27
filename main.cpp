@@ -27,7 +27,6 @@ enum find_mode_t{
     LONGEST, // longest complete orf;
     LONGEST_MATCH, // default (highest number of inframe bases shared above thresholds) - if alignment specified - will be decided by alignment instead;
     BEST, // closest to the reference (even if not as long
-    VALIDATE // instructs orfanage to use phylocsf tracks for validating novel segments only (does not search for actual ORFs)
 };
 
 std::string mode_to_str(const find_mode_t mode) noexcept{
@@ -48,9 +47,6 @@ std::string mode_to_str(const find_mode_t mode) noexcept{
         case BEST:
             mode_str = "BEST";
             break;
-        case VALIDATE:
-            mode_str = "VALIDATE";
-            break;
         default:
             std::cerr<<"invalid mode selected: "<<mode<<std::endl;
             exit(-7);
@@ -69,9 +65,6 @@ struct DEFAULTS{
     int percent_ident = -1; // percent identity
     int gapo = 4; // gap open
     int gape = 2; // gap extend
-
-    int ppp_mincodons = 25;
-    float ppp_minscore = 0.0;
 } def_params;
 
 struct Parameters{
@@ -99,12 +92,6 @@ struct Parameters{
 
     std::ofstream stats_fp;
     std::ofstream out_gtf_fp;
-
-    // PhyloCSF
-    std::string ppp_track_fname;
-    find_mode_t ppp_mode = LONGEST;
-    int ppp_mincodons = 25;
-    float ppp_minscore = 0.0;
 
     bool use_id = false; // if enabled will use query gene ids to form bundles. the same reference id may be evaluated in multiple bundles if overlaps queries with different gene ids
     bool non_aug = false; // If enabled, non-AUG start codons in reference transcripts will not be discarded and will be considered in overlapping query transcripts on equal grounds with the AUG start codon.
@@ -272,56 +259,6 @@ int run_align(std::vector<std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>
     return 1;
 }
 
-void run_ppp(std::vector<std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>>& stats,Transcriptome& transcriptome, TX* q, TX* t){
-    if(global_params.ppp_mode==LONGEST || global_params.ppp_mode==BEST){ // todo: add to the stats
-        std::pair<SEGTP,float> ppp_chain = transcriptome.compute_tx_cds_ppp(*q);
-
-        TX qseg = *q;
-        qseg.set_cds_start(std::get<0>(ppp_chain).get_start());
-        qseg.set_cds_end(std::get<0>(ppp_chain).get_end());
-        qseg.set_cds_phase(std::get<0>(ppp_chain).get_phase());
-        qseg.build_cds();
-
-        if(qseg.cds_chain()->clen()<global_params.cds_minlen){return;}
-
-        Score qseg_score = qseg.score(*t);
-        qseg_score.ppp_score = std::get<1>(ppp_chain);
-        stats.back().push_back(std::make_tuple(std::get<0>(ppp_chain),qseg,*t,qseg_score,"ppp"));
-        if(qseg_score.lpi<global_params.len_perc_ident ||
-           qseg_score.ilpi<global_params.len_frame_perc_ident ||
-           qseg_score.mlpi<global_params.len_match_perc_ident){
-            std::get<3>(stats.back().back()).pass = false;
-            return;
-        }
-    }
-    else if(global_params.ppp_mode==VALIDATE){ // only perform validation of novel transcripts
-        const uint64_t chr_len = transcriptome.get_chrom_len(q->get_seqid());
-        std::array<std::vector<std::vector<float> >, 4> extracted_scores; // phase 0, phase 1, phase 2, power
-        transcriptome.compute_PhyloCSF_for_transcript(*q, extracted_scores);(*q, extracted_scores);
-
-        for(auto& sc : stats){
-            for(auto& seg : sc){
-                if(!std::get<3>(seg).pass){continue;}
-
-                bool ppp_pass = true;
-                std::tuple<float, float> ppp_scores = transcriptome.compute_PhyloCSF(std::get<1>(seg), extracted_scores,q->get_strand()=='+'?0:chr_len);
-                std::get<3>(seg).ppp_score = std::get<0>(ppp_scores);
-                if(std::get<0>(ppp_scores) < global_params.ppp_minscore){
-                    ppp_pass = false;
-                }
-
-                if (!ppp_pass) {
-                    std::get<3>(seg).pass=false;
-                } // remove
-            }
-        }
-    }
-    else{
-        std::cerr<<"unknown mode selected for PPP: "<<mode_to_str(global_params.ppp_mode)<<std::endl;
-        exit(-7);
-    }
-}
-
 int  run(){
     #ifdef DEBUG
         std::cout<<"Running in DEBUG"<<std::endl;
@@ -374,12 +311,6 @@ int  run(){
     std::cerr<<"loading query transcriptome"<<std::endl;
 
     transcriptome.add(global_params.query_fname,false,false);
-
-    if(!global_params.ppp_track_fname.empty()){
-        std::cerr<<"loading phylocsf tracks"<<std::endl;
-        transcriptome.set_ppp(global_params.ppp_track_fname, mode_to_str(global_params.ppp_mode),global_params.ppp_mincodons,global_params.ppp_minscore);
-        transcriptome.load_ppptracks();
-    }
 
     std::cerr<<"bundling transcriptome"<<std::endl;
     transcriptome.bundleup(global_params.use_id);
@@ -622,16 +553,6 @@ int  run(){
                 run_align(stats, fndr);
             }
 
-            // TODO: PPP should realistically only run if we don't find anything else
-            //   but also when validation is enabled
-            //   or as a validation for any novel segments of the ORF
-            //   PPP does not require alignment (plus we don't know which template to use for alignment in the first place)
-            //   We only need to run if no good/suitable orfanage result is available
-            //   if phylocsf is requested - compute for the current qseg and add all to the current list for evaluation
-            if(!global_params.ppp_track_fname.empty()){
-                run_ppp(stats,transcriptome,q,t);
-            }
-
 #ifdef DEBUG
             if(std::strcmp(q->get_tid().c_str(),"CHS.34256.1")==0){ // rna-XM_011520617.2
                 std::cout<<"found"<<std::endl;
@@ -790,12 +711,6 @@ int main(int argc, char** argv) {
     args.add_option("gapo",ArgParse::Type::INT,"Gap-open penalty", ArgParse::Level::GENERAL,false);
     args.add_option("gape",ArgParse::Type::INT,"Gap-extension penalty", ArgParse::Level::GENERAL,false);
 
-    // PhyloCSF++
-    args.add_option("ppp_mode", ArgParse::Type::STRING, "[EXPERIMENTAL]: Which CDS to report: LONGEST, BEST. Default: " + mode_to_str(global_params.ppp_mode), ArgParse::Level::GENERAL, false);
-    args.add_option("min-score", ArgParse::Type::FLOAT, "[EXPERIMENTAL]: Only consider ORFs with a minimum weighted PhyloCSF mean score (range from -15 to +15, >0 more likely to be protein-coding). Default: " + std::to_string(global_params.ppp_minscore), ArgParse::Level::GENERAL, false);
-    args.add_option("min-codons", ArgParse::Type::INT, "[EXPERIMENTAL]: Only consider ORFs with a minimum codon length. Default: " + std::to_string(global_params.ppp_mincodons), ArgParse::Level::GENERAL, false);
-    args.add_option("tracks", ArgParse::Type::STRING, "[EXPERIMENTAL]: Path to the bigWig file PhyloCSF+1.bw (expects the other 5 frames to be in the same directory, optionally the power track).",ArgParse::Level::GENERAL, false);
-
     args.add_positional_argument("templates", ArgParse::Type::STRING, "One or more GFF/GTF files with coding exons to be used as templates.", true, true);
 
     args.add_option("help", ArgParse::Type::FLAG, "Prints this help message.", ArgParse::Level::HELP, false);
@@ -861,36 +776,6 @@ int main(int argc, char** argv) {
         }
     }
 
-    // Now check for PhyloCSF parameters
-    // This is an adaptation of code by Christopher Pockrandt from PhyloCSF++
-    if(args.is_set("tracks")){
-        std::string bw_path = args.get_string("tracks");
-        const size_t bw_path_suffix_pos = bw_path.find("+1");
-        if (bw_path_suffix_pos == std::string::npos){
-            std::cerr<<"Could not find '+1' in tracks file name. Expecting a name like 'PhyloCSF+1.bw'."<<std::endl;
-            exit(3);
-        }
-        for (uint16_t i = 0; i < 7; ++i){
-            std::string suffix;
-            if (i == 6) {
-                suffix = "power";
-            }
-            else {
-                suffix = ((i < 3) ? "+" : "-") + std::to_string((i % 3) + 1);
-            }
-            bw_path.replace(bw_path_suffix_pos, 2, suffix); // NOTE: length of "+1" is 2
-            if(!file_exists(bw_path)){
-                std::cerr << "PhyloCSF track is not found: "<<bw_path<<std::endl;
-                exit(3);
-            }
-        }
-
-        global_params.ppp_track_fname = args.get_string("tracks");
-    }
-
-    global_params.ppp_mincodons = args.is_set("min-codons") ? args.get_int("min-codons") : def_params.ppp_mincodons;
-    global_params.ppp_minscore = args.is_set("min-score") ? args.get_float("min-score") : def_params.ppp_minscore;
-
     if (args.is_set("mode")){
         global_params.mode_array.clear();
 
@@ -930,23 +815,6 @@ int main(int argc, char** argv) {
         }
         else{
             printf(OUT_ERROR "Please choose a valid mode (START_MATCH, ALL, LONGEST, LONGEST_MATCH, BEST)!\n" OUT_RESET);
-            return -1;
-        }
-    }
-
-    global_params.ppp_mode = LONGEST;
-    if (args.is_set("ppp_mode")){
-        std::string ppp_mode = args.get_string("ppp_mode");
-        std::transform(ppp_mode.begin(), ppp_mode.end(), ppp_mode.begin(), toupper);
-
-        if (ppp_mode == "LONGEST")
-            global_params.ppp_mode = LONGEST;
-        else if (ppp_mode == "BEST")
-            global_params.ppp_mode = BEST;
-        else if (ppp_mode == "VALIDATE")
-            global_params.ppp_mode = VALIDATE;
-        else{
-            printf(OUT_ERROR "Please choose a valid ppp_mode (LONGEST, BEST, VALIDATE)!\n" OUT_RESET);
             return -1;
         }
     }
