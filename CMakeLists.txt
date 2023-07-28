@@ -55,60 +55,54 @@ if (ORFANAGE_STATIC_BUILD)
 endif ()
 
 # KLIB
-include_directories("${CMAKE_SOURCE_DIR}/include/ksw2/")
+FetchContent_Declare(
+  ksw2
+  GIT_REPOSITORY https://github.com/lh3/ksw2.git
+  GIT_TAG        289609bd9e5381a13b16239d0a7703f1ff03f9ca
+)
 
 # GCLIB
-include_directories("${CMAKE_SOURCE_DIR}/include/")
-
-
-# Add the ksw2 source files
-# add_library(ksw2 STATIC
-#         ${CMAKE_SOURCE_DIR}/include/ksw2/cli.c
-#         ${CMAKE_SOURCE_DIR}/include/ksw2/kalloc.c
-#         ${CMAKE_SOURCE_DIR}/include/ksw2/kalloc.h
-#         ${CMAKE_SOURCE_DIR}/include/ksw2/kseq.h
-#         ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2_extd2_sse.c
-#         ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2_extd.c
-#         ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2_extf2_sse.c
-#         ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2_exts2_sse.c
-#         ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2_extz2_sse.c
-#         ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2_extz.c
-#         ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2_gg2.c
-#         ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2_gg2_sse.c
-#         ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2_gg.c
-#         ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2.h
-# )
-
-configure_file(${CMAKE_SOURCE_DIR}/include/ksw2/ksw2_extz2_sse.c ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2_extz2_sse.cpp COPYONLY)
-
-add_library(ksw2 STATIC
-        ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2.h
-        ${CMAKE_SOURCE_DIR}/include/ksw2/ksw2_extz2_sse.cpp
+FetchContent_Declare(
+  gclib
+  GIT_REPOSITORY https://github.com/gpertea/gclib.git
+  GIT_TAG        dcb0141c1faa589e87755dbbc7f658d1ac58b3b4
 )
-set_target_properties(ksw2 PROPERTIES LINKER_LANGUAGE CXX)
+
+FetchContent_MakeAvailable(ksw2 gclib)
+
+include_directories("${ksw2_SOURCE_DIR}/")
+include_directories("${gclib_SOURCE_DIR}/")
+
+configure_file(${ksw2_SOURCE_DIR}/ksw2_extz2_sse.c ${ksw2_SOURCE_DIR}/ksw2_extz2_sse.cpp COPYONLY)
+
+add_library(ksw2_lib STATIC
+        ${ksw2_SOURCE_DIR}/ksw2.h
+        ${ksw2_SOURCE_DIR}/ksw2_extz2_sse.cpp
+)
+set_target_properties(ksw2_lib PROPERTIES LINKER_LANGUAGE CXX)
 
 
 add_executable(orfanage
-        ${CMAKE_SOURCE_DIR}/include/gclib/gff.h
-        ${CMAKE_SOURCE_DIR}/include/gclib/gff.cpp
-        ${CMAKE_SOURCE_DIR}/include/gclib/GStr.h
-        ${CMAKE_SOURCE_DIR}/include/gclib/GStr.cpp
-        ${CMAKE_SOURCE_DIR}/include/gclib/GBase.h
-        ${CMAKE_SOURCE_DIR}/include/gclib/GBase.cpp
-        ${CMAKE_SOURCE_DIR}/include/gclib/codons.h
-        ${CMAKE_SOURCE_DIR}/include/gclib/codons.cpp
-        ${CMAKE_SOURCE_DIR}/include/gclib/gdna.h
-        ${CMAKE_SOURCE_DIR}/include/gclib/gdna.cpp
-        ${CMAKE_SOURCE_DIR}/include/gclib/GStr.h
-        ${CMAKE_SOURCE_DIR}/include/gclib/GStr.cpp
-        ${CMAKE_SOURCE_DIR}/include/gclib/GVec.hh
-        ${CMAKE_SOURCE_DIR}/include/gclib/GList.hh
-        ${CMAKE_SOURCE_DIR}/include/gclib/GHash.hh
-        ${CMAKE_SOURCE_DIR}/include/gclib/GFaSeqGet.h
-        ${CMAKE_SOURCE_DIR}/include/gclib/GFaSeqGet.cpp
-        ${CMAKE_SOURCE_DIR}/include/gclib/GFastaIndex.h
-        ${CMAKE_SOURCE_DIR}/include/gclib/GFastaIndex.cpp
-        ${CMAKE_SOURCE_DIR}/include/gclib/GFastaFile.h
+        ${gclib_SOURCE_DIR}/gff.h
+        ${gclib_SOURCE_DIR}/gff.cpp
+        ${gclib_SOURCE_DIR}/GStr.h
+        ${gclib_SOURCE_DIR}/GStr.cpp
+        ${gclib_SOURCE_DIR}/GBase.h
+        ${gclib_SOURCE_DIR}/GBase.cpp
+        ${gclib_SOURCE_DIR}/codons.h
+        ${gclib_SOURCE_DIR}/codons.cpp
+        ${gclib_SOURCE_DIR}/gdna.h
+        ${gclib_SOURCE_DIR}/gdna.cpp
+        ${gclib_SOURCE_DIR}/GStr.h
+        ${gclib_SOURCE_DIR}/GStr.cpp
+        ${gclib_SOURCE_DIR}/GVec.hh
+        ${gclib_SOURCE_DIR}/GList.hh
+        ${gclib_SOURCE_DIR}/GHash.hh
+        ${gclib_SOURCE_DIR}/GFaSeqGet.h
+        ${gclib_SOURCE_DIR}/GFaSeqGet.cpp
+        ${gclib_SOURCE_DIR}/GFastaIndex.h
+        ${gclib_SOURCE_DIR}/GFastaIndex.cpp
+        ${gclib_SOURCE_DIR}/GFastaFile.h
         ${CMAKE_SOURCE_DIR}/src/arg_parse.hpp
         ${CMAKE_SOURCE_DIR}/src/Transcriptome.cpp
         ${CMAKE_SOURCE_DIR}/src/Transcriptome.h
@@ -124,8 +118,8 @@ add_executable(orfanage
 #    target_compile_definitions(orfanage PUBLIC DEBUG=0)
 #endif()
 
-include_directories(ksw2)
-target_link_libraries(orfanage ksw2)
+include_directories(ksw2_lib)
+target_link_libraries(orfanage ksw2_lib)
 
 target_link_libraries(orfanage z)
 

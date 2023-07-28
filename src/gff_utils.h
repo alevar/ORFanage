@@ -4,10 +4,10 @@
 
 #ifndef GFF_UTILS_H
 #define GFF_UTILS_H
-#include <gclib/gff.h>
-#include <gclib/GStr.h>
-#include <gclib/GVec.hh>
-#include <gclib/GFaSeqGet.h>
+#include <gff.h>
+#include <GStr.h>
+#include <GVec.hh>
+#include <GFaSeqGet.h>
 
 extern bool verbose;
 extern bool debugMode;

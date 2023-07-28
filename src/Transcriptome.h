@@ -12,7 +12,7 @@
 #include <string>
 #include <cassert>
 
-#include <gclib/gff.h>
+#include <gff.h>
 #include <map>
 #include "common.hpp"
 #include "gff_utils.h"
