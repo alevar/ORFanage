@@ -1,14 +1,18 @@
 ORFanage: Ultra-efficient and sensitive method to search for ORFs in spliced genomes guided by reference annotation to maximize protein similarity within genes.
 =======================================================================================================================================================================
 
+.. image:: https://img.shields.io/conda/dn/bioconda/orfanage.svg?style=flag&label=BioConda%20install
+    :target: https://anaconda.org/bioconda/orfanage
+    :alt: BioConda Install
+.. image:: https://img.shields.io/github/downloads/alevar/orfanage/total.svg
+    :target: https://github.com/cpockrandt/PhyloCSFpp/releases/latest
+    :alt: Github All Releases
 .. image:: https://readthedocs.org/projects/orfanage/badge/?version=latest
 	:target: http://orfanage.readthedocs.org/en/latest
 	:alt: Documentation Status
-
 .. image:: https://img.shields.io/badge/License-GPLv3-blue.svg
     :target: https://opensource.org/licenses/GPL-3.0
     :alt: GPLv3 License
-    
 .. image:: https://img.shields.io/github/v/tag/alevar/orfanage?style=flat-square
 	: [#sashimi]_target: https://img.shields.io/github/v/tag/alevar/orfanage?style=flat-square
 	:alt: GitHub tag (latest SemVer)
@@ -131,14 +135,6 @@ Options:
                       will run alignment between passing pairs.
   --gapo INT          Gap-open penalty
   --gape INT          Gap-extension penalty
-  --ppp_mode STRING   Which CDS to report: LONGEST, BEST. Default: LONGEST <EXPERIMENTAL>
-  --min-score FLOAT   Only consider ORFs with a minimum weighted PhyloCSF mean score
-                      (range from -15 to +15, >0 more likely to be protein-coding).
-                      Default: 0.000000
-  --min-codons INT    Only consider ORFs with a minimum codon length. Default: 25
-  --tracks STRING     Path to the bigWig file PhyloCSF+1.bw (expects the other 5
-                      frames to be in the same directory, optionally the power
-                      track).
 
 Help options:
 

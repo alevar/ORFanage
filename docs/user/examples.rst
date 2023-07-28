@@ -6,7 +6,7 @@ Examples
 In this section, we will walk you through a sample workflow using ORFanage to annotate ORFs in a simple locus. 
 To illustrate the process in a clear and concise way, we will use a single locus and a subset of isoforms from the CHESS dataset [#chess]_.
 
-To run this example, you will need the GTF annotations provided in the main repository's ``examples`` directory. 
+To run this example, you will need the GTF annotations provided in the main repository's ``example`` directory.
 Additionally, you will need to provide a GRCh38 copy of the human reference genome to run the examples as intended.
 
 This sample workflow serves as a helpful guide for annotating ORFs, and it can be easily adapted to suit your specific needs.
@@ -33,7 +33,7 @@ To do so, we run **ORFanage** with the following command:
 
 ::
 
-	$ orfanage --reference genome.fa --query examples/query.gtf --output examples/orfanage.gtf --stats examples.orfanage.stats.tsv examples/template.gtf
+	$ orfanage --reference genome.fa --query example/query.gtf --output example/orfanage.gtf --stats example/orfanage.stats.tsv example/template.gtf
 
 This command analyzes the novel isoforms and annotates possible ORFs. The resulting CDS regions are displayed in the image below.
 
@@ -45,7 +45,7 @@ and wish to remove CDS annotations from them. To do so, we re-run the analysis w
 
 ::
 
-	$ orfanage --ilpi 60 --reference genome.fa --query examples/query.gtf --output examples/orfanage.gtf examples/template.gtf
+	$ orfanage --ilpi 60 --reference genome.fa --query example/query.gtf --output example/orfanage.gtf example/template.gtf
 
 The resulting annotated transcripts, with CDS annotations removed from non-coding isoforms, are shown in the image below.
 

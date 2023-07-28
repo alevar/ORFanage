@@ -3,6 +3,13 @@
 Installation
 ========================
 
+BioConda
+--------------
+
+By far the easiest way to install ORFanage is by using bioconda as follows: ::
+
+        $ conda install -c conda-forge -c bioconda orfanage
+
 
 Using Pre-Built Binaries
 -------------------------------
