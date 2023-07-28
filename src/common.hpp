@@ -92,8 +92,7 @@ struct Score{
                            "alignment_match\t"
                            "start_match\t"
                            "stop_match\t"
-                           "pi\t"
-                           "ppp_score";
+                           "pi";
         return res;
     };
     friend std::ostream& operator<<(std::ostream& os, const Score& s){
@@ -112,8 +111,7 @@ struct Score{
            << s.aln_match << "\t"
            << s.start_match << "\t"
            << s.stop_match << "\t"
-           << s.aln_pi << "\t"
-           << s.ppp_score;
+           << s.aln_pi;
 
         return os;
     };
