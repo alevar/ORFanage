@@ -13,8 +13,8 @@ ORFanage: Ultra-efficient and sensitive method to search for ORFs in spliced gen
 .. image:: https://img.shields.io/badge/License-GPLv3-blue.svg
     :target: https://opensource.org/licenses/GPL-3.0
     :alt: GPLv3 License
-.. image:: https://img.shields.io/github/v/tag/alevar/orfanage?style=flat-square
-	: [#sashimi]_target: https://img.shields.io/github/v/tag/alevar/orfanage?style=flat-square
+.. image:: https://img.shields.io/github/v/tag/alevar/orfanage?style=flat-square.svg
+    :target: https://img.shields.io/github/v/tag/alevar/orfanage?style=flat-square
 	:alt: GitHub tag (latest SemVer)
 
 .. contents::
