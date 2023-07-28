@@ -44,6 +44,15 @@ A much more comprehensive documentation for ORFanage is provided on `ReadTheDocs
 Installation
 ^^^^^^^^^^^^
 
+BioConda
+""""""""""""
+
+By far the easiest way to install ORFanage is by using BioConda.
+
+::
+
+        $ conda install -c conda-forge -c bioconda orfanage
+
 Building from source
 """"""""""""""""""""
 
