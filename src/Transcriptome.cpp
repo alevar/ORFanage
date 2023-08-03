@@ -38,7 +38,8 @@ TX::TX(uint seqid, GffObj* tx,int idx,bool is_templ){
     this->is_templ=is_templ;
     this->id = idx;
     this->tid = tx->getID();
-    this->gid = tx->getGeneID();
+    char* tmp_gid = tx->getGeneID();
+    this->gid = tmp_gid==NULL ? this->tid : tmp_gid;
     this->seqid = seqid;
     this->strand = tx->strand;
     this->source = tx->getTrackName();
