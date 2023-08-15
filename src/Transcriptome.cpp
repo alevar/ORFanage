@@ -639,6 +639,10 @@ void Transcriptome::add(const std::string& gtf_fname,bool is_templ,bool coding_o
     for (int i = 0; i < gffReader.gflst.Count(); ++i) {
         GffObj *pGffObj = gffReader.gflst.Get(i);
 
+        if(!pGffObj->isTranscript()){ // skip records which could not be transformed into a transcript
+            continue;
+        }
+
         if (!coding_only || pGffObj->hasCDS()) {
             this->n2i_it.first = this->seqnames_ids.find(pGffObj->getGSeqName());
             TX tmp(this->n2i_it.first->second, pGffObj, tx_vec.size(), is_templ);
