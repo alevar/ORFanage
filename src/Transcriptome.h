@@ -17,7 +17,6 @@
 #include "common.hpp"
 #include "gff_utils.h"
 
-#include <bigWig.h>
 #include <sstream>
 #include <set>
 
