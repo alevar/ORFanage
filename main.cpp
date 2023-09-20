@@ -223,7 +223,7 @@ std::pair<int,int> find_best_stat(std::map<std::pair<int,int>,std::vector<std::t
     std::pair<int,int> best_se = stats_flat.begin()->first;
     Score best_score = std::get<3>(stats_flat.begin()->second.front());
     for(auto& kv : stats_flat){
-        if (score_gt(best_score,std::get<3>(kv.second.front()))){
+        if (score_gt(std::get<3>(kv.second.front()),best_score)){
             best_score = std::get<3>(kv.second.front());
             best_se = kv.first;
         }
@@ -382,7 +382,7 @@ int  run(){
             stats.clear();
             q=bundle_it->operator[](qi);
 #ifdef DEBUG
-            if(std::strcmp(q->get_tid().c_str(),"CHS.34256.1")==0){
+            if(std::strcmp(q->get_tid().c_str(),"XLOC_000145-mRNA-2")==0){
                 std::cout<<"found"<<std::endl;
             }
 #endif
