@@ -674,6 +674,8 @@ int  run(){
         };
     }
 
+    std::cerr<<"Done"<<std::endl;
+
     return 0;
 }
 
