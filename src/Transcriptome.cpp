@@ -162,6 +162,12 @@ void TX::_get_nt_seq(CHAIN& chain,std::string& res){
     }
     return;
 }
+
+// TODO: extension - should we create a wrapper class for sequence data such that handles extension? What if extension is enabled for the bundle (bundle load extended data), but this function forgets the argument?
+//    bundle should load sequence with extension and adjust start coordinate.
+//    when transcripts load sequence, they should store extension separately, thus only querying it if necessary, but otherwise not going over bound
+//    if extension is necessary and transcript coordinates are adjusted - the part of the extension from the sequence needs to be poped from extension and merged into main transcript sequence
+//    store two extensions - 3' and 5'
 int TX::adjust_stop(){ // adjust the chain coordinates to stop at the first stop codon
     if(this->seq.empty()){return 0;}
 
@@ -256,13 +262,43 @@ int TX::get_next_codon_nt(uint pos,std::string& nc, bool towards_end){
     }
     return lp;
 }
-void TX::extend_to_stop(){ // searches downstream of the CDS for the next stop codon in the same frame
+void TX::extend_to_stop(int extend_len){ // searches downstream of the CDS for the next stop codon in the same frame
     if(this->seq.get_aa(this->seq.cds_aa_len()-1)=='.'){ // stop already present
         return;
     }
+
+    // if requested - extend sequence
+    if(extend_len>0){ // consider additional sequence
+        std::string extension_str = "";
+        if(this->strand=='+'){
+            uint32_t extension_start = std::min(this->exons.get_end()+1,(int)this->bundle->get_end());
+            uint32_t extension_end = std::min(this->exons.get_end()+extend_len,(int)this->bundle->get_end());
+            extension_str = this->bundle->get_nts(extension_start,extension_end);
+        }
+        else{ // strand=='-'
+            uint32_t extension_start = std::max(this->exons.get_start()-extend_len,(int)this->bundle->get_start());
+            uint32_t extension_end = std::max(this->exons.get_start()-1,(int)this->bundle->get_start());
+            std::string tmp = this->bundle->get_nts(extension_start,extension_end);
+            for(int i=tmp.size()-1;i>=0;i--){
+                extension_str+=ntComplement(tmp[i]);
+            }
+        }
+        this->seq.append_seq(extension_str);
+    }
+
     std::vector<uint> stops;
-    uint res = this->seq.find_inframe_codon('.',';',stops,this->seq.get_cds_end()+1,this->seq.get_exon_len(),true,true);
+    uint res = this->seq.find_inframe_codon('.',';',stops,this->seq.get_cds_end()+1,this->seq.get_exon_len(),true,true);    
     if(res!=0){ // stop is found - adjust accordingly
+        // if extension requested and stop found within extension - set new transcript coordinates
+        if(extend_len>0){
+            int extension_len = ((stops[0]+2)-this->exons.clen())+1;
+            if(strand=='+'){
+                (this->exons.end()-1)->set_end(this->exons.get_end()+extension_len);
+            }
+            else{
+                this->exons.begin()->set_start(this->exons.get_start()-extension_len);
+            }
+        }
         int chain_extension_len = (stops[0]+2)-this->seq.get_cds_end();
         this->seq.extend_to_pos(stops[0]+2);
         // modify the chain accordinly
@@ -270,6 +306,10 @@ void TX::extend_to_stop(){ // searches downstream of the CDS for the next stop c
         this->cds_start = this->cds.get_start();
         this->cds_end = this->cds.get_end();
     }
+    
+    // reload sequence to adjust for the changed coordinates
+    this->load_seq();
+    
     return;
 }
 // this version will search for the first available start codon resulting in the longest possible ORF
@@ -412,7 +452,8 @@ uint TX::inframe_len(TX* t){ // it doesn't matter that we do this stranded - eit
     }
     return res;
 }
-int TX::rescue_cds(bool allow_non_aug,TX* t){
+
+int TX::rescue_cds(bool allow_non_aug,int extend_len, TX* t){
     if(this->seq.cds_nt_len()<3){
         this->remove_cds();
         return 0;
@@ -423,7 +464,7 @@ int TX::rescue_cds(bool allow_non_aug,TX* t){
         this->remove_cds();
         return 0;
     }
-    extend_to_stop();
+    extend_to_stop(extend_len);
     if(t == nullptr){
         if(!allow_non_aug){
             extend_to_start();
@@ -439,6 +480,7 @@ int TX::rescue_cds(bool allow_non_aug,TX* t){
     if(run_adjust_start){
         adjust_start();
     }
+
     this->set_cds_phase(0);
     return 1;
 }
@@ -573,13 +615,17 @@ bool Bundle::add_tx(TX* t,bool use_id){
 //    t->set_bundle_ref(this);
     return true;
 }
+
+// extends coordinates of the bundle to the specified coordinate
+void Bundle::extend_to(uint32_t pos){
+    this->bstart = std::min(this->bstart,(int)pos);
+    this->bend = std::max(this->bend,(int)pos);
+}
 void Bundle::load_seq(GFaSeqGet* seq){
-#ifdef DEBUG
-//    if(this->bstart+this->blen()>=seq->getseqlen() || this->bstart<0){
-//        std::cerr<<"bundle+stop codon extends past the end of the reference sequence"<<std::endl;
-//        exit(2);
-//    }
-#endif
+    if(this->bstart+this->blen()>=seq->getseqlen() || this->bstart<0){
+        std::cerr<<"bundle+stop codon extends past the end of the reference sequence"<<std::endl;
+        exit(2);
+    }
     int tmp_blen = this->blen();
 
     this->bundle_seq = std::string(seq->subseq(this->bstart,tmp_blen),tmp_blen);
@@ -675,7 +721,8 @@ GFaSeqGet* Transcriptome::get_fasta_seq(int seqid){
     return this->loaded_seq;
 }
 
-uint Transcriptome::bundleup(bool use_id){ // create bundles and return the total number of bundles
+uint Transcriptome::bundleup(bool use_id, uint32_t overhang){ // create bundles and return the total number of bundles
+    // if rescue_len is enabled - will extend bundles by that number of bases to enable rescue lookup up and down stream of the original locus coordinates
     this->sort(use_id);
     this->bundles.clear();
     this->bundles.push_back(Bundle());
@@ -683,7 +730,7 @@ uint Transcriptome::bundleup(bool use_id){ // create bundles and return the tota
     GFaSeqGet* seqid_seq = nullptr;
     int cur_seqid = -1;
     std::string seqid_name;
-    if(this->check_ref && !this->tx_vec.empty()){ // preload reference based on the fron transcript
+    if(this->check_ref && !this->tx_vec.empty()){ // preload reference based on the front transcript
         cur_seqid = this->tx_vec.front().get_seqid();
         int res = this->seqid2name(cur_seqid,seqid_name);
         assert(res==0);
@@ -693,6 +740,17 @@ uint Transcriptome::bundleup(bool use_id){ // create bundles and return the tota
     for(auto& t : this->tx_vec){
         if(!this->bundles.back().can_add(&t,use_id)){
             if(this->check_ref){
+                // compute overhangs to not overextend past the end of the reference
+                uint32_t new_start_pos = std::max(this->bundles.back().get_start()-overhang,(uint32_t)0);
+                uint32_t new_end_pos = std::min(this->bundles.back().get_end()+overhang,(uint32_t)seqid_seq->getseqlen()-1);
+                // make sure these operations did not shorten the data
+                assert(new_start_pos<=this->bundles.back().get_start());
+                assert(new_end_pos>=this->bundles.back().get_end());
+                // extend
+                this->bundles.back().extend_to(new_start_pos);
+                this->bundles.back().extend_to(new_end_pos);
+
+                // load sequence information
                 this->bundles.back().load_seq(seqid_seq);
                 if(t.get_seqid()!=cur_seqid){
                     cur_seqid = t.get_seqid();
@@ -709,6 +767,16 @@ uint Transcriptome::bundleup(bool use_id){ // create bundles and return the tota
         }
     }
     if(this->check_ref){
+        // compute overhangs to not overextend past the end of the reference
+        uint32_t new_start_pos = std::max(this->bundles.back().get_start()-overhang,(uint32_t)0);
+        uint32_t new_end_pos = std::min(this->bundles.back().get_end()+overhang,(uint32_t)seqid_seq->getseqlen()-1);
+        // make sure these operations did not shorten the data
+        assert(new_start_pos<=this->bundles.back().get_start());
+        assert(new_end_pos>=this->bundles.back().get_end());
+        // extend
+        this->bundles.back().extend_to(new_start_pos);
+        this->bundles.back().extend_to(new_end_pos);
+
         this->bundles.back().load_seq(seqid_seq);
     }
 
@@ -749,10 +817,10 @@ uint Transcriptome::clean_short_orfs(int minlen){
     }
     return res;
 }
-uint Transcriptome::clean_cds(bool rescue){
+uint Transcriptome::clean_cds(bool rescue,int extend_len,bool use_id){
     uint res = 0;
 
-    this->bundleup();
+    this->bundleup(use_id,extend_len);
     for(auto& bundle : this->bundles){
         for(auto& tx : bundle){
             if(!tx->has_cds()){continue;}
@@ -760,7 +828,7 @@ uint Transcriptome::clean_cds(bool rescue){
 
             if(this->check_ref){
                 if(rescue){
-                    tx->rescue_cds(this->allow_non_aug); // TODO: allow non aug - needs to allow storage of non-aug transcripts (only perform cleaning based on stop codons) and no start extension. And needs to handle querrying appropriately
+                    tx->rescue_cds(this->allow_non_aug,extend_len); // TODO: allow non aug - needs to allow storage of non-aug transcripts (only perform cleaning based on stop codons) and no start extension. And needs to handle querrying appropriately
                 }
                 char start_codon = tx->get_codon_aa(0);
                 char stop_codon = tx->get_codon_aa(tx->aa_len()-1);

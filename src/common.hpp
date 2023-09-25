@@ -297,9 +297,17 @@ inline void find_all_codons(const std::string & dna, const std::string & codon, 
 struct SEQ{
 public:
     SEQ()=default;
-    SEQ(std::string& exon_nt_seq){
+    SEQ(std::string& exon_nt_seq, uint tx_start = 0, uint tx_end = 0){
+        // The tx_start and tx_end sets where on the sequence the transcript begins and ends.
+        // This will allow searching up and down stream of the transcript bounds
         this->exon_nt = exon_nt_seq;
         transform(this->exon_nt.begin(), this->exon_nt.end(), this->exon_nt.begin(), ::toupper);
+    }
+
+
+    void append_seq(std::string seq){
+        transform(seq.begin(), seq.end(), seq.begin(), ::toupper);
+        this->exon_nt += seq;
     }
 
     void set_cds(uint start_pos,uint end_pos){

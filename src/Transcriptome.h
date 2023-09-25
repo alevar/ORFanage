@@ -667,11 +667,11 @@ public:
     int get_next_codon_nt(uint pos,std::string& nc, bool towards_end);
     void extend_cds_chain(uint num_pos,bool forward){return this->cds.extend(this->exons,num_pos,forward);}
     void extend_cds_chain_to_pos(uint pos,bool forward){return this->cds.extend_to_pos(this->exons,pos,forward);}
-    void extend_to_stop(); // searches downstream of the CDS for the next stop codon in the same frame
+    void extend_to_stop(int extend_len=0); // searches downstream of the CDS for the next stop codon in the same frame
     void extend_to_start(int new_start=-1);
     uint inframe_len(TX* t);
     void extend_to_start(TX* t,bool allow_non_aug=false);
-    int rescue_cds(bool allow_non_aug=false,TX* t=nullptr);
+    int rescue_cds(bool allow_non_aug=false, int extend_len=0,TX* t=nullptr);
     void remove_seq();
     void load_seq();
     bool seq_loaded(){return !this->seq.empty();}
@@ -882,6 +882,8 @@ public:
     void load_seq(GFaSeqGet* seq);
     void clear_seq(){bundle_seq.clear();}
 
+    void extend_to(uint32_t pos); // extends coordinates of the bundle to the specified coordinate
+
     bool has_template() const;
     bool has_query() const;
 
@@ -950,10 +952,10 @@ public:
     }
     int seqid2name(int seqid,std::string& seqid_name);
     GFaSeqGet* get_fasta_seq(int seqid);
-    uint bundleup(bool use_id=false); // create bundles and return the total number of bundles
+    uint bundleup(bool use_id=false, uint32_t rescue_len=0); // create bundles and return the total number of bundles
     void build_cds_chains();
     uint clean_short_orfs(int minlen);
-    uint clean_cds(bool rescue=false);
+    uint clean_cds(bool rescue, int extend_len, bool use_id);
     uint deduplicate(bool use_id=false);
     void set_cds_as_exons();
     void remove_non_coding();

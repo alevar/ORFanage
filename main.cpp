@@ -61,6 +61,8 @@ struct DEFAULTS{
     int cds_minlen = -1; // minimum length
     int num_threads = 1;
 
+    int overhang = 0;
+
     // Alignment
     int percent_ident = -1; // percent identity
     int gapo = 4; // gap open
@@ -77,6 +79,8 @@ struct Parameters{
     int cds_minlen = -1; // minimum length
     std::vector<find_mode_t> mode_array{LONGEST_MATCH,BEST,START_MATCH,LONGEST,ALL}; // priority order of modes
     int num_threads = 1;
+
+    int overhang = 0;
 
     // Alignment
     int percent_ident = -1; // percent identity
@@ -296,7 +300,7 @@ int  run(){
     transcriptome.sort();
 
     if(global_params.clean_templ) {
-        rstats.num_dirty = transcriptome.clean_cds(global_params.rescue); // TODO: if we load sequence data into bundles - this is not cost effective...
+        rstats.num_dirty = transcriptome.clean_cds(global_params.rescue,global_params.overhang, global_params.use_id); // TODO: if we load sequence data into bundles - this is not cost effective...
     }
 
     transcriptome.set_cds_as_exons();
@@ -313,7 +317,7 @@ int  run(){
     transcriptome.add(global_params.query_fname,false,false);
 
     std::cerr<<"bundling transcriptome"<<std::endl;
-    transcriptome.bundleup(global_params.use_id);
+    transcriptome.bundleup(global_params.use_id,global_params.overhang);
 
     std::cerr<<"starting main evaluation"<<std::endl;
 
@@ -327,46 +331,44 @@ int  run(){
 
         // REFERENCELESS BUNDLE
         if(!bundle_it->has_template() || !bundle_it->has_query()){
-            if(global_params.stats_fp.is_open()){
-                for(int qi=0;qi<bundle_it->size();qi++) {
-                    q = bundle_it->operator[](qi);
+            for(int qi=0;qi<bundle_it->size();qi++) {
+                q = bundle_it->operator[](qi);
 #ifdef DEBUG
-                    if(std::strcmp(q->get_tid().c_str(),"CHS.11626.7")==0){ // rna-XM_011520617.2
-                        std::cout<<"found"<<std::endl;
-                    }
+                if(std::strcmp(q->get_tid().c_str(),"CHS.11626.7")==0){ // rna-XM_011520617.2
+                    std::cout<<"found"<<std::endl;
+                }
 #endif
-                    if(q->is_template()){continue;}
-                    std::string cur_seqid;
-                    transcriptome.seqid2name(q->get_seqid(),cur_seqid);
+                if(q->is_template()){continue;}
+                std::string cur_seqid;
+                transcriptome.seqid2name(q->get_seqid(),cur_seqid);
 #ifndef DEBUG
 #pragma omp critical
 #endif
-                    {
-                        if(global_params.keep_cds && q->has_cds()) {
-                            q->build_cds();
-                        }
-                        global_params.out_gtf_fp << q->str(cur_seqid) << std::endl;
-                        global_params.stats_fp << q->get_tid() << "\t"
-                                               << "-" << "\t"
-                                               << "-" << "\t"
-                                               << "-" << "\t"
-                                               << "-" << "\t"
-                                               << "-" << "\t"
-                                               << "-" << "\t"
-                                               << "-" << "\t"
-                                               << "-" << "\t"
-                                               << "-" << "\t"
-                                               << "-" << "\t"
-                                               << "-" << "\t"
-                                               << "-" << "\t"
-                                               << "-" << "\t"
-                                               << "-" << "\t"
-                                               << "-" << "\t"
-                                               << "-" << "\t"
-                                               << "-" << "\t"
-                                               << "-" << "\t"
-                                               << "-" << std::endl;
+                {
+                    if(global_params.keep_cds && q->has_cds()) {
+                        q->build_cds();
                     }
+                    global_params.out_gtf_fp << q->str(cur_seqid) << std::endl;
+                    global_params.stats_fp << q->get_tid() << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << std::endl;
                 }
             }
             continue;
@@ -487,7 +489,7 @@ int  run(){
                         }
                         qseg.load_seq();
 
-                        int ret = qseg.rescue_cds(global_params.non_aug,t);
+                        int ret = qseg.rescue_cds(global_params.non_aug,global_params.overhang,t);
                         std::get<1>(stats.back().back())=qseg;
                         if(!ret){
                             std::get<4>(stats.back().back())="not_rescued";
@@ -704,6 +706,7 @@ int main(int argc, char** argv) {
     args.add_option("use_id",ArgParse::Type::FLAG,"If enabled, only transcripts with the same gene ID from the query file will be used to form a bundle. In this mode the same template transcript may be used in several bundles, if overlaps transcripts with different gene_ids.",ArgParse::Level::GENERAL,false);
     args.add_option("non_aug",ArgParse::Type::FLAG,"If enabled, non-AUG start codons in reference transcripts will not be discarded and will be considered in overlapping query transcripts on equal grounds with the AUG start codon.",ArgParse::Level::GENERAL,false);
     args.add_option("keep_cds",ArgParse::Type::FLAG,"If enabled, any CDS already present in the query will be kept unmodified.",ArgParse::Level::GENERAL,false);
+    args.add_option("overhang",ArgParse::Type::INT,"If enabled, will also evaluate nucleotide sequence up and downstream up to N bases as set for the argument.",ArgParse::Level::GENERAL,false);
 
     // Alignment
     args.add_option("pi",ArgParse::Type::INT,"Percent identity between the query and template sequences. This option requires --reference parameter to be set. If enabled - will run alignment between passing pairs.", ArgParse::Level::GENERAL,false);
@@ -830,6 +833,8 @@ int main(int argc, char** argv) {
     global_params.len_frame_perc_ident = args.is_set("ilpi") ? args.get_int("ilpi") : def_params.len_frame_perc_ident;
     global_params.len_match_perc_ident = args.is_set("mlpi") ? args.get_int("mlpi") : def_params.len_match_perc_ident;
     global_params.percent_ident = args.is_set("pi") ? args.get_int("pi") : def_params.percent_ident;
+
+    global_params.overhang = args.is_set("overhang") ? args.get_int("overhang") : def_params.overhang; // TODO: unimplemented!()
 
     global_params.gapo = args.is_set("gapo") ? args.get_int("gapo") : def_params.gapo;
     global_params.gape = args.is_set("gape") ? args.get_int("gape") : def_params.gape;
