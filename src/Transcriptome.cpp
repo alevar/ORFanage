@@ -262,36 +262,53 @@ int TX::get_next_codon_nt(uint pos,std::string& nc, bool towards_end){
     }
     return lp;
 }
-void TX::extend_to_stop(int extend_len){ // searches downstream of the CDS for the next stop codon in the same frame
-    if(this->seq.get_aa(this->seq.cds_aa_len()-1)=='.'){ // stop already present
-        return;
-    }
-
+// extends TX sequence data by N bases if available in bundle
+void TX::extend_seq(int extend_len,bool towards_stop){
     // if requested - extend sequence
     if(extend_len>0){ // consider additional sequence
         std::string extension_str = "";
-        if(this->strand=='+'){
-            uint32_t extension_start = std::min(this->exons.get_end()+1,(int)this->bundle->get_end());
-            uint32_t extension_end = std::min(this->exons.get_end()+extend_len,(int)this->bundle->get_end());
-            extension_str = this->bundle->get_nts(extension_start,extension_end);
+        uint32_t extension_start;
+        uint32_t extension_end;
+        if((this->strand=='+' && towards_stop) || (this->strand=='-' && !towards_stop)){
+            extension_start = std::min(this->exons.get_end()+1,(int)this->bundle->get_end());
+            extension_end = std::min(this->exons.get_end()+extend_len,(int)this->bundle->get_end());
         }
         else{ // strand=='-'
-            uint32_t extension_start = std::max(this->exons.get_start()-extend_len,(int)this->bundle->get_start());
-            uint32_t extension_end = std::max(this->exons.get_start()-1,(int)this->bundle->get_start());
+            extension_start = std::max(this->exons.get_start()-extend_len,(int)this->bundle->get_start());
+            extension_end = std::max(this->exons.get_start()-1,(int)this->bundle->get_start());
+        }
+        if(this->strand=='+'){
+            extension_str = this->bundle->get_nts(extension_start,extension_end);
+        }
+        else{
             std::string tmp = this->bundle->get_nts(extension_start,extension_end);
             for(int i=tmp.size()-1;i>=0;i--){
                 extension_str+=ntComplement(tmp[i]);
             }
         }
-        this->seq.append_seq(extension_str);
+        if(towards_stop){
+            this->seq.append_seq(extension_str);
+        }
+        else{ // if extending the start - need to also adjust cds_start and cds_end accordingly
+            this->seq.push_front(extension_str);
+        }
+
+    }
+}
+void TX::extend_to_stop(int extend_len){ // searches downstream of the CDS for the next stop codon in the same frame
+    if(this->seq.get_aa(this->seq.cds_aa_len()-1)=='.'){ // stop already present
+        return;
     }
 
+    this->extend_seq(extend_len,true);
+
     std::vector<uint> stops;
-    uint res = this->seq.find_inframe_codon('.',';',stops,this->seq.get_cds_end()+1,this->seq.get_exon_len(),true,true);    
+    uint res = this->seq.find_inframe_codon('.',';',stops,this->seq.get_cds_end()+1,this->seq.get_exon_len(),true,true);
     if(res!=0){ // stop is found - adjust accordingly
         // if extension requested and stop found within extension - set new transcript coordinates
         if(extend_len>0){
             int extension_len = ((stops[0]+2)-this->exons.clen())+1;
+            extension_len = std::max(extension_len,0); // if extension is less than 0 - means stop found within transcript and not in the extension. Need to trim to the original coordinates
             if(strand=='+'){
                 (this->exons.end()-1)->set_end(this->exons.get_end()+extension_len);
             }
@@ -306,24 +323,42 @@ void TX::extend_to_stop(int extend_len){ // searches downstream of the CDS for t
         this->cds_start = this->cds.get_start();
         this->cds_end = this->cds.get_end();
     }
-    
+
     // reload sequence to adjust for the changed coordinates
     this->load_seq();
-    
+
     return;
 }
+
 // this version will search for the first available start codon resulting in the longest possible ORF
-void TX::extend_to_start(int new_start){ // searches upstream for the available start codons
+void TX::extend_to_start(int new_start,int extend_len){ // searches upstream for the available start codons
     if(new_start==-1){ // start coordinate is not provided - search
         if(this->seq.get_aa(0)=='M'){ // start already present
             return;
         }
+        this->extend_seq(extend_len,false);
         std::vector<uint> starts;
         uint res = this->seq.find_inframe_codon('M','.',starts,this->seq.get_cds_start(),0,false,true);
+
+        if(res!=0){ // start is found - adjust accordingly
+            // if extension requested and start found within extension - set new transcript coordinates
+            if(extend_len>0){
+                int extension_len = extend_len-starts[0];
+                extension_len = std::max(extension_len,0); // if extension is less than 0 - means stop found within transcript and not in the extension. Need to trim to the original coordinates
+                if(strand=='+'){
+                    this->exons.begin()->set_start(this->exons.get_start()-extension_len);
+                }
+                else{
+                    (this->exons.end()-1)->set_end(this->exons.get_end()+extension_len);
+                }
+            }
+            new_start = starts[0];
+        }
+
         if(res==0){
+            this->load_seq();
             return;
         }
-        new_start = starts[0];
     }
 
     int chain_extension_len = this->seq.get_cds_start()-new_start;
@@ -332,14 +367,16 @@ void TX::extend_to_start(int new_start){ // searches upstream for the available 
     this->extend_cds_chain(chain_extension_len,this->strand=='-');
     this->cds_start = this->cds.get_start();
     this->cds_end = this->cds.get_end();
+    this->load_seq();
     return;
 }
+
 // this version of the extension function will search for the start codon which maximizes the similarity to the original template ORF
-void TX::extend_to_start(TX* ref_tx,bool allow_non_aug){ // extends to start while comparing to the closest reference
+bool TX::extend_to_start(TX* ref_tx,bool allow_non_aug){ // extends to start while comparing to the closest reference
     // can skip the ckeck if the start coordinate is the same as the reference and is M
     char start_codon = this->get_codon_aa(0);
     bool match_start = this->strand=='+' ? this->get_cds_start()==ref_tx->get_cds_start() : this->get_cds_end()==ref_tx->get_cds_end();
-    if((start_codon=='M' || allow_non_aug) && match_start){return;}
+    if((start_codon=='M' || allow_non_aug) && match_start){return true;}
 
     // check non-aug
     if(allow_non_aug){
@@ -354,8 +391,8 @@ void TX::extend_to_start(TX* ref_tx,bool allow_non_aug){ // extends to start whi
             std::vector<uint> stops;
             uint res = this->seq.find_inframe_codon('.',';',stops,this->seq.get_cds_start(),ref_start_in_this,false,true);
             if(res==0){
-                extend_to_start(ref_start_in_this);
-                return;
+                extend_to_start(ref_start_in_this, 0);
+                return true;
             }
         }
     }
@@ -363,7 +400,7 @@ void TX::extend_to_start(TX* ref_tx,bool allow_non_aug){ // extends to start whi
     // otherwise - search for the best start codon
     std::vector<uint> transcriptomic_starts;
     uint res = this->seq.find_inframe_codon('M','.',transcriptomic_starts,this->seq.get_cds_start(),0,false,false);
-    if(res==0){return;}
+    if(res==0){return false;}
 
     int max_chain_extension_len = this->seq.get_cds_start()-transcriptomic_starts.back();
 
@@ -377,8 +414,8 @@ void TX::extend_to_start(TX* ref_tx,bool allow_non_aug){ // extends to start whi
     int old_start = this->strand=='+' ? ref_tx->get_cds_start() : ref_tx->get_cds_end();
     for(auto& s : genomic_starts){
         if(s==old_start){
-            extend_to_start(transcriptomic_starts[si]);
-            return;
+            extend_to_start(transcriptomic_starts[si], 0);
+            return true;
         }
         si++;
     }
@@ -433,7 +470,7 @@ void TX::extend_to_start(TX* ref_tx,bool allow_non_aug){ // extends to start whi
     this->seq.extend_to_pos(transcriptomic_starts[best_start_idx]);
     this->cds_start = this->cds.get_start();
     this->cds_end = this->cds.get_end();
-    return;
+    return true;
 }
 uint TX::inframe_len(TX* t){ // it doesn't matter that we do this stranded - either way the number of inframe codons should be the same
     uint res = 0;
@@ -467,11 +504,14 @@ int TX::rescue_cds(bool allow_non_aug,int extend_len, TX* t){
     extend_to_stop(extend_len);
     if(t == nullptr){
         if(!allow_non_aug){
-            extend_to_start();
+            extend_to_start(-1,extend_len);
         }
     }
-    else{
-        extend_to_start(t,allow_non_aug);
+    else{ // try to find a start codon guided by reference. If not - search normally
+        bool found_start = extend_to_start(t,allow_non_aug);
+        if(!found_start){
+            extend_to_start(-1,extend_len);
+        }
     }
     bool run_adjust_start = true;
     if(allow_non_aug && t!= nullptr){

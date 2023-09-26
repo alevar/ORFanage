@@ -667,10 +667,13 @@ public:
     int get_next_codon_nt(uint pos,std::string& nc, bool towards_end);
     void extend_cds_chain(uint num_pos,bool forward){return this->cds.extend(this->exons,num_pos,forward);}
     void extend_cds_chain_to_pos(uint pos,bool forward){return this->cds.extend_to_pos(this->exons,pos,forward);}
-    void extend_to_stop(int extend_len=0); // searches downstream of the CDS for the next stop codon in the same frame
-    void extend_to_start(int new_start=-1);
+    void extend_seq(int extend_len, bool towards_stop);
+    void extend_to_stop(int extend_len); // searches downstream of the CDS for the next stop codon in the same frame
+    
+    
+    void extend_to_start(int new_start,int extend_len);
     uint inframe_len(TX* t);
-    void extend_to_start(TX* t,bool allow_non_aug=false);
+    bool extend_to_start(TX* t,bool allow_non_aug);
     int rescue_cds(bool allow_non_aug=false, int extend_len=0,TX* t=nullptr);
     void remove_seq();
     void load_seq();

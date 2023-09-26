@@ -310,6 +310,14 @@ public:
         this->exon_nt += seq;
     }
 
+    // add sequence to the front of the exon_nt sequence
+    void push_front(std::string seq){
+        this->cds_start+=seq.length();
+        this->cds_end+=seq.length();
+        transform(seq.begin(), seq.end(), seq.begin(), ::toupper);
+        this->exon_nt = seq + this->exon_nt;
+    }
+
     void set_cds(uint start_pos,uint end_pos){
 #ifdef DEBUG
         assert(start_pos<this->exon_nt.size());
