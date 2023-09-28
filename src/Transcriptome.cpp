@@ -662,7 +662,7 @@ void Bundle::extend_to(uint32_t pos){
     this->bend = std::max(this->bend,(int)pos);
 }
 void Bundle::load_seq(GFaSeqGet* seq){
-    if(this->bstart+this->blen()>=seq->getseqlen() || this->bstart<0){
+    if((this->bstart+this->blen()-1)>seq->getseqlen() || this->bstart<0){
         std::cerr<<"bundle+stop codon extends past the end of the reference sequence"<<std::endl;
         exit(2);
     }
@@ -781,8 +781,8 @@ uint Transcriptome::bundleup(bool use_id, uint32_t overhang){ // create bundles 
         if(!this->bundles.back().can_add(&t,use_id)){
             if(this->check_ref){
                 // compute overhangs to not overextend past the end of the reference
-                uint32_t new_start_pos = std::max(this->bundles.back().get_start()-overhang,(uint32_t)0);
-                uint32_t new_end_pos = std::min(this->bundles.back().get_end()+overhang,(uint32_t)seqid_seq->getseqlen()-1);
+                uint32_t new_start_pos = (uint32_t)std::max((int)this->bundles.back().get_start()-(int)overhang,(int)1); // convert to int to avoid overflow when subtracting overhang
+                uint32_t new_end_pos = std::min(this->bundles.back().get_end()+overhang,(uint32_t)seqid_seq->getseqlen());
                 // make sure these operations did not shorten the data
                 assert(new_start_pos<=this->bundles.back().get_start());
                 assert(new_end_pos>=this->bundles.back().get_end());
@@ -808,8 +808,8 @@ uint Transcriptome::bundleup(bool use_id, uint32_t overhang){ // create bundles 
     }
     if(this->check_ref){
         // compute overhangs to not overextend past the end of the reference
-        uint32_t new_start_pos = std::max(this->bundles.back().get_start()-overhang,(uint32_t)0);
-        uint32_t new_end_pos = std::min(this->bundles.back().get_end()+overhang,(uint32_t)seqid_seq->getseqlen()-1);
+        uint32_t new_start_pos = (uint32_t)std::max((int)this->bundles.back().get_start()-(int)overhang,(int)1); // convert to int to avoid overflow when subtracting overhang
+        uint32_t new_end_pos = std::min(this->bundles.back().get_end()+overhang,(uint32_t)seqid_seq->getseqlen());
         // make sure these operations did not shorten the data
         assert(new_start_pos<=this->bundles.back().get_start());
         assert(new_end_pos>=this->bundles.back().get_end());
