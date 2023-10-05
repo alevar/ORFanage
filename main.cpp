@@ -81,6 +81,7 @@ struct Parameters{
     int num_threads = 1;
 
     int overhang = 0;
+    bool spliced_overhang = false;
 
     // Alignment
     int percent_ident = -1; // percent identity
@@ -101,8 +102,8 @@ struct Parameters{
     bool non_aug = false; // If enabled, non-AUG start codons in reference transcripts will not be discarded and will be considered in overlapping query transcripts on equal grounds with the AUG start codon.
     // TODO: seleno
     bool seleno = false; // If enabled, all premature stop codons in the reference will be treated as selenocysteine instead and if matched in query - will be retained, but only if the exact position is matched in the same frame.
-    bool keep_cds = false; // If enabled, any CDS already presernt in the query will be kept unmodified
-
+    bool keep_all_cds = false; // If enabled, any CDS already present in the query will be kept unmodified
+    bool keep_cds_if_not_found = false; // if enabled CDS present in query transcripts when no ORF can be detected will be preserved.
 } global_params;
 
 struct RunStats{
@@ -300,7 +301,7 @@ int  run(){
     transcriptome.sort();
 
     if(global_params.clean_templ) {
-        rstats.num_dirty = transcriptome.clean_cds(global_params.rescue,global_params.overhang, global_params.use_id); // TODO: if we load sequence data into bundles - this is not cost effective...
+        rstats.num_dirty = transcriptome.clean_cds(global_params.rescue,global_params.overhang, global_params.spliced_overhang, global_params.use_id); // TODO: if we load sequence data into bundles - this is not cost effective...
     }
 
     transcriptome.set_cds_as_exons();
@@ -317,7 +318,7 @@ int  run(){
     transcriptome.add(global_params.query_fname,false,false);
 
     std::cerr<<"bundling transcriptome"<<std::endl;
-    transcriptome.bundleup(global_params.use_id,global_params.overhang);
+    transcriptome.bundleup(global_params.use_id,global_params.overhang,global_params.spliced_overhang);
 
     std::cerr<<"starting main evaluation"<<std::endl;
 
@@ -328,6 +329,7 @@ int  run(){
         std::vector<Bundle>::iterator bundle_it = transcriptome.bbegin();
         bundle_it+=bi;
         TX *q,*t;
+        TX q_copy;
 
         // REFERENCELESS BUNDLE
         if(!bundle_it->has_template() || !bundle_it->has_query()){
@@ -345,7 +347,7 @@ int  run(){
 #pragma omp critical
 #endif
                 {
-                    if(global_params.keep_cds && q->has_cds()) {
+                    if((global_params.keep_all_cds || global_params.keep_cds_if_not_found) && q->has_cds()) {
                         q->build_cds();
                     }
                     global_params.out_gtf_fp << q->str(cur_seqid) << std::endl;
@@ -383,13 +385,17 @@ int  run(){
         for(int qi=0;qi<bundle_it->size();qi++){
             stats.clear();
             q=bundle_it->operator[](qi);
+            TX og_q = *q; // original query with the original CDS
 #ifdef DEBUG
             if(std::strcmp(q->get_tid().c_str(),"XLOC_000145-mRNA-2")==0){
                 std::cout<<"found"<<std::endl;
             }
 #endif
             if(q->is_template()){continue;}
-            if(global_params.keep_cds && q->has_cds()){
+            if(global_params.keep_cds_if_not_found && q->has_cds()){ // if we are keeping CDS if not found - we need to build it here and store in the original query transcript
+                og_q.build_cds();
+            }
+            if(global_params.keep_all_cds && q->has_cds()){
                 q->build_cds();
                 std::string cur_seqid;
                 transcriptome.seqid2name(q->get_seqid(),cur_seqid);
@@ -489,7 +495,7 @@ int  run(){
                         }
                         qseg.load_seq();
 
-                        int ret = qseg.rescue_cds(global_params.non_aug,global_params.overhang,t);
+                        int ret = qseg.rescue_cds(global_params.non_aug,global_params.overhang,global_params.spliced_overhang,t);
                         std::get<1>(stats.back().back())=qseg;
                         if(!ret){
                             std::get<4>(stats.back().back())="not_rescued";
@@ -571,28 +577,35 @@ int  run(){
 #pragma omp critical
 #endif
             if(stats_flat.empty() || best_se.first<0){
+                // if requested keep_cds_if_not_found - handle here
+                std::string keep_cds_result = "-";
+                if (global_params.keep_cds_if_not_found && og_q.has_cds()){
+                    q = &og_q;
+                    q->build_cds();
+                    keep_cds_result = "keep_cds_if_not_found";
+                }
                 q->add_attribute("orfanage_status","0");
                 global_params.out_gtf_fp<<q->str(cur_seqid)<<std::endl;
                 global_params.stats_fp<<q->get_tid()<<"\t"
                                       << "-" << "\t"
-                                      << "-" << "\t"
-                                      << "-" << "\t"
-                                      << "-" << "\t"
-                                      << "-" << "\t"
-                                      << "-" << "\t"
-                                      << "-" << "\t"
-                                      << "-" << "\t"
-                                      << "-" << "\t"
-                                      << "-" << "\t"
-                                      << "-" << "\t"
-                                      << "-" << "\t"
-                                      << "-" << "\t"
-                                      << "-" << "\t"
-                                      << "-" << "\t"
-                                      << "-" << "\t"
-                                      << "-" << "\t"
-                                      << "-" << "\t"
-                                      << "-" << std::endl;
+                                           << "-" << "\t"
+                                           << "keep_cds" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << "\t"
+                                           << "-" << std::endl;
             }
             else{
                 if(global_params.mode_array[0]==ALL){ // output all
@@ -705,8 +718,12 @@ int main(int argc, char** argv) {
     args.add_option("threads",ArgParse::Type::INT,"Number of threads to run in parallel",ArgParse::Level::GENERAL,false);
     args.add_option("use_id",ArgParse::Type::FLAG,"If enabled, only transcripts with the same gene ID from the query file will be used to form a bundle. In this mode the same template transcript may be used in several bundles, if overlaps transcripts with different gene_ids.",ArgParse::Level::GENERAL,false);
     args.add_option("non_aug",ArgParse::Type::FLAG,"If enabled, non-AUG start codons in reference transcripts will not be discarded and will be considered in overlapping query transcripts on equal grounds with the AUG start codon.",ArgParse::Level::GENERAL,false);
-    args.add_option("keep_cds",ArgParse::Type::FLAG,"If enabled, any CDS already present in the query will be kept unmodified.",ArgParse::Level::GENERAL,false);
+
+    args.add_option("keep_all_cds",ArgParse::Type::FLAG,"Mutually exclusive with '--keep_cds_if_not_found'. If enabled, any CDS already present in the query will be kept unmodified.",ArgParse::Level::GENERAL,false);
+    args.add_option("keep_cds_if_not_found",ArgParse::Type::FLAG,"Mutually exclusive with '--keep_all_cds'. If enabled, will still search for new ORF in each query transcript. If query transcript has CDS annotated, and no ORF can be identified by the method, the original will be kept. Original CDS will be replaced if a valid ORF can be found. Use '--keep_all_cds' to retain all unmodified CDS in query.",ArgParse::Level::GENERAL,false);
+
     args.add_option("overhang",ArgParse::Type::INT,"If enabled, will also evaluate nucleotide sequence up and downstream up to N bases as set for the argument.",ArgParse::Level::GENERAL,false);
+    args.add_option("spliced_overhang",ArgParse::Type::FLAG,"Only in effect when combined with the '--overhang' parameter. If enabled, this option will extend the sequence up to the '--overhang' number of bases, but terminate prematurely if either a splice donor (if extending towards 3') or splice acceptor (if extending towards 5') is detected.",ArgParse::GENERAL,false);
 
     // Alignment
     args.add_option("pi",ArgParse::Type::INT,"Percent identity between the query and template sequences. This option requires --reference parameter to be set. If enabled - will run alignment between passing pairs.", ArgParse::Level::GENERAL,false);
@@ -834,7 +851,8 @@ int main(int argc, char** argv) {
     global_params.len_match_perc_ident = args.is_set("mlpi") ? args.get_int("mlpi") : def_params.len_match_perc_ident;
     global_params.percent_ident = args.is_set("pi") ? args.get_int("pi") : def_params.percent_ident;
 
-    global_params.overhang = args.is_set("overhang") ? args.get_int("overhang") : def_params.overhang; // TODO: unimplemented!()
+    global_params.overhang = args.is_set("overhang") ? args.get_int("overhang") : def_params.overhang;
+    global_params.spliced_overhang = args.is_set("spliced_overhang") ? true : false;
 
     global_params.gapo = args.is_set("gapo") ? args.get_int("gapo") : def_params.gapo;
     global_params.gape = args.is_set("gape") ? args.get_int("gape") : def_params.gape;
@@ -852,8 +870,16 @@ int main(int argc, char** argv) {
         global_params.non_aug = true;
     }
 
-    if(args.is_set("keep_cds")){
-        global_params.keep_cds = true;
+    if(args.is_set("keep_all_cds")){
+        global_params.keep_all_cds = true;
+    }
+    if(args.is_set("keep_cds_if_not_found")){
+        global_params.keep_cds_if_not_found = true;
+    }
+
+    if (global_params.keep_all_cds && global_params.keep_cds_if_not_found){
+        std::cerr<<"'--keep_all_cds' and '--keep_cds_if_not_found' are mutually exclusive flags. Please choose one or the other"<<std::endl;
+        exit(1);
     }
 
     global_params.output_fname = args.get_string("output");

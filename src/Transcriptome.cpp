@@ -263,7 +263,8 @@ int TX::get_next_codon_nt(uint pos,std::string& nc, bool towards_end){
     return lp;
 }
 // extends TX sequence data by N bases if available in bundle
-void TX::extend_seq(int extend_len,bool towards_stop){
+// when extending sequence - check for AG/GT (depending on the direction and terminate
+void TX::extend_seq(int extend_len, bool spliced_extend, bool towards_stop){
     // if requested - extend sequence
     if(extend_len>0){ // consider additional sequence
         std::string extension_str = "";
@@ -287,20 +288,36 @@ void TX::extend_seq(int extend_len,bool towards_stop){
             }
         }
         if(towards_stop){
+            if (spliced_extend){ // if requested to consider donor/acceptor and since extending to stop - search for GT and if found - trim to there to avoid extending past the potential junction
+                // trim extension_str to before the first GT
+                transform(extension_str.begin(), extension_str.end(), extension_str.begin(), ::toupper);
+                int gt_pos = extension_str.find("GT");
+                if(gt_pos!=-1){
+                    extension_str = extension_str.substr(0,gt_pos);
+                }
+            }
             this->seq.append_seq(extension_str);
         }
         else{ // if extending the start - need to also adjust cds_start and cds_end accordingly
+            if (spliced_extend){ // if requested to consider donor/acceptor and since extending to start - search for AG and if found - trim to there to avoid extending past the potential junction
+                // trim extension_str to after the last AG
+                transform(extension_str.begin(), extension_str.end(), extension_str.begin(), ::toupper);
+                int ag_pos = extension_str.rfind("AG");
+                if(ag_pos!=-1){
+                    extension_str = extension_str.substr(ag_pos+2);
+                }
+            }
             this->seq.push_front(extension_str);
         }
 
     }
 }
-void TX::extend_to_stop(int extend_len){ // searches downstream of the CDS for the next stop codon in the same frame
+void TX::extend_to_stop(int extend_len, bool spliced_extend){ // searches downstream of the CDS for the next stop codon in the same frame
     if(this->seq.get_aa(this->seq.cds_aa_len()-1)=='.'){ // stop already present
         return;
     }
 
-    this->extend_seq(extend_len,true);
+    this->extend_seq(extend_len,spliced_extend, true);
 
     std::vector<uint> stops;
     uint res = this->seq.find_inframe_codon('.',';',stops,this->seq.get_cds_end()+1,this->seq.get_exon_len(),true,true);
@@ -331,12 +348,12 @@ void TX::extend_to_stop(int extend_len){ // searches downstream of the CDS for t
 }
 
 // this version will search for the first available start codon resulting in the longest possible ORF
-void TX::extend_to_start(int new_start,int extend_len){ // searches upstream for the available start codons
+void TX::extend_to_start(int new_start,int extend_len, bool spliced_extend){ // searches upstream for the available start codons
     if(new_start==-1){ // start coordinate is not provided - search
         if(this->seq.get_aa(0)=='M'){ // start already present
             return;
         }
-        this->extend_seq(extend_len,false);
+        this->extend_seq(extend_len, spliced_extend, false);
         std::vector<uint> starts;
         uint res = this->seq.find_inframe_codon('M','.',starts,this->seq.get_cds_start(),0,false,true);
 
@@ -391,7 +408,7 @@ bool TX::extend_to_start(TX* ref_tx,bool allow_non_aug){ // extends to start whi
             std::vector<uint> stops;
             uint res = this->seq.find_inframe_codon('.',';',stops,this->seq.get_cds_start(),ref_start_in_this,false,true);
             if(res==0){
-                extend_to_start(ref_start_in_this, 0);
+                extend_to_start(ref_start_in_this, 0, false);
                 return true;
             }
         }
@@ -414,7 +431,7 @@ bool TX::extend_to_start(TX* ref_tx,bool allow_non_aug){ // extends to start whi
     int old_start = this->strand=='+' ? ref_tx->get_cds_start() : ref_tx->get_cds_end();
     for(auto& s : genomic_starts){
         if(s==old_start){
-            extend_to_start(transcriptomic_starts[si], 0);
+            extend_to_start(transcriptomic_starts[si], 0, false);
             return true;
         }
         si++;
@@ -490,7 +507,7 @@ uint TX::inframe_len(TX* t){ // it doesn't matter that we do this stranded - eit
     return res;
 }
 
-int TX::rescue_cds(bool allow_non_aug,int extend_len, TX* t){
+int TX::rescue_cds(bool allow_non_aug,int extend_len, bool spliced_extend, TX* t){
     if(this->seq.cds_nt_len()<3){
         this->remove_cds();
         return 0;
@@ -501,16 +518,16 @@ int TX::rescue_cds(bool allow_non_aug,int extend_len, TX* t){
         this->remove_cds();
         return 0;
     }
-    extend_to_stop(extend_len);
+    extend_to_stop(extend_len,spliced_extend);
     if(t == nullptr){
         if(!allow_non_aug){
-            extend_to_start(-1,extend_len);
+            extend_to_start(-1,extend_len,spliced_extend);
         }
     }
     else{ // try to find a start codon guided by reference. If not - search normally
         bool found_start = extend_to_start(t,allow_non_aug);
         if(!found_start){
-            extend_to_start(-1,extend_len);
+            extend_to_start(-1,extend_len,spliced_extend);
         }
     }
     bool run_adjust_start = true;
@@ -761,7 +778,7 @@ GFaSeqGet* Transcriptome::get_fasta_seq(int seqid){
     return this->loaded_seq;
 }
 
-uint Transcriptome::bundleup(bool use_id, uint32_t overhang){ // create bundles and return the total number of bundles
+uint Transcriptome::bundleup(bool use_id, uint32_t overhang,bool spliced_extend){ // create bundles and return the total number of bundles
     // if rescue_len is enabled - will extend bundles by that number of bases to enable rescue lookup up and down stream of the original locus coordinates
     this->sort(use_id);
     this->bundles.clear();
@@ -857,10 +874,10 @@ uint Transcriptome::clean_short_orfs(int minlen){
     }
     return res;
 }
-uint Transcriptome::clean_cds(bool rescue,int extend_len,bool use_id){
+uint Transcriptome::clean_cds(bool rescue,int extend_len,bool spliced_extend,bool use_id){
     uint res = 0;
 
-    this->bundleup(use_id,extend_len);
+    this->bundleup(use_id,extend_len,spliced_extend);
     for(auto& bundle : this->bundles){
         for(auto& tx : bundle){
             if(!tx->has_cds()){continue;}
@@ -868,7 +885,7 @@ uint Transcriptome::clean_cds(bool rescue,int extend_len,bool use_id){
 
             if(this->check_ref){
                 if(rescue){
-                    tx->rescue_cds(this->allow_non_aug,extend_len); // TODO: allow non aug - needs to allow storage of non-aug transcripts (only perform cleaning based on stop codons) and no start extension. And needs to handle querrying appropriately
+                    tx->rescue_cds(this->allow_non_aug,extend_len,spliced_extend); // TODO: allow non aug - needs to allow storage of non-aug transcripts (only perform cleaning based on stop codons) and no start extension. And needs to handle querrying appropriately
                 }
                 char start_codon = tx->get_codon_aa(0);
                 char stop_codon = tx->get_codon_aa(tx->aa_len()-1);
