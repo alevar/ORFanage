@@ -12,10 +12,10 @@
 #include <gff_utils.h>
 #include <unordered_set>
 
-#include "ksw2.h"
-
 #ifndef DEBUG
-    #include <omp.h>
+    #ifdef OPENMP_AVAILABLE
+        #include <omp.h>
+    #endif
 #endif
 
 #include "arg_parse.hpp"
@@ -62,11 +62,6 @@ struct DEFAULTS{
     int num_threads = 1;
 
     int overhang = 0;
-
-    // Alignment
-    int percent_ident = -1; // percent identity
-    int gapo = 4; // gap open
-    int gape = 2; // gap extend
 } def_params;
 
 struct Parameters{
@@ -82,11 +77,6 @@ struct Parameters{
 
     int overhang = 0;
     bool spliced_overhang = false;
-
-    // Alignment
-    int percent_ident = -1; // percent identity
-    int gapo = 4; // gap open
-    int gape = 2; // gap extend
 
     std::string reference_fasta_fname;
     std::string query_fname;
@@ -136,15 +126,8 @@ bool score_lt(const Score& lhs, const Score& rhs){
                 }
                 break;
             case BEST: // PI if alignment enabled - otherwise ilpi
-                if(global_params.percent_ident==-1){ // no alignment was being performed - use ilpi
-                    if(lhs.ilpi != rhs.ilpi){
-                        return lhs.ilpi < rhs.ilpi;
-                    }
-                }
-                else{
-                    if(lhs.aln_pi != rhs.aln_pi){
-                        return lhs.aln_pi < rhs.aln_pi;
-                    }
+                if(lhs.ilpi != rhs.ilpi){
+                    return lhs.ilpi < rhs.ilpi;
                 }
                 break;
             default:
@@ -179,15 +162,8 @@ bool score_gt(const Score& lhs, const Score& rhs){
                 }
                 break;
             case BEST: // PI if alignment enabled - otherwise ilpi
-                if(global_params.percent_ident==-1){ // no alignment was being performed - use ilpi
-                    if(lhs.ilpi != rhs.ilpi){
-                        return lhs.ilpi > rhs.ilpi;
-                    }
-                }
-                else{
-                    if(lhs.aln_pi != rhs.aln_pi){
-                        return lhs.aln_pi > rhs.aln_pi;
-                    }
+                if(lhs.ilpi != rhs.ilpi){
+                    return lhs.ilpi > rhs.ilpi;
                 }
                 break;
             default:
@@ -239,31 +215,6 @@ std::pair<int,int> find_best_stat(std::map<std::pair<int,int>,std::vector<std::t
     return best_se;
 }
 
-int run_align(std::vector<std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>>& stats, Finder* fndr){
-    for(auto& sc : stats){
-        for(auto& seg : sc){
-            if(!std::get<3>(seg).pass){continue;}
-
-            if (!std::get<1>(seg).get_template()->seq_loaded()) {std::get<1>(seg).get_template()->load_seq();} // only load sequence if not previously loaded
-            ksw_extz_t ez;
-            fndr->align(std::get<1>(seg).get_template()->get_aa().c_str(), std::get<1>(seg).get_aa().c_str(), ez);
-            if (ez.n_cigar == 0) {
-                std::get<3>(seg).pass =false;
-            }
-            else{
-                int ret = fndr->parse(ez, std::get<1>(seg).get_aa(), std::get<1>(seg).get_template()->get_aa(), std::get<3>(seg));
-                std::get<3>(seg).aln_match = std::get<3>(seg).num_aln_match();
-                std::get<3>(seg).aln_pi = std::get<3>(seg).pi();
-                if (ret < 0 || std::get<3>(seg).aln_pi < global_params.percent_ident) {
-                    std::get<3>(seg).pass = false;
-                }
-            }
-            free(ez.cigar);
-        }
-    }
-    return 1;
-}
-
 int  run(){
     #ifdef DEBUG
         std::cout<<"Running in DEBUG"<<std::endl;
@@ -276,10 +227,6 @@ int  run(){
     }
     if(global_params.non_aug){
         transcriptome.use_non_aug();
-    }
-    if(global_params.percent_ident>-1){
-        assert(!global_params.reference_fasta_fname.empty());
-        transcriptome.set_aligner(mat50,aa_table,global_params.gapo,global_params.gape);
     }
 
     std::cerr<<"loading reference transcriptomes"<<std::endl;
@@ -323,7 +270,9 @@ int  run(){
     std::cerr<<"starting main evaluation"<<std::endl;
 
 #ifndef DEBUG
-    #pragma omp parallel for schedule(dynamic)
+    #ifdef OPENMP_AVAILABLE
+        #pragma omp parallel for schedule(dynamic)
+    #endif
 #endif
     for(int bi=0;bi<transcriptome.bsize();bi++){ // iterate over bundles
         std::vector<Bundle>::iterator bundle_it = transcriptome.bbegin();
@@ -344,7 +293,9 @@ int  run(){
                 std::string cur_seqid;
                 transcriptome.seqid2name(q->get_seqid(),cur_seqid);
 #ifndef DEBUG
-#pragma omp critical
+    #ifdef OPENMP_AVAILABLE
+        #pragma omp critical
+    #endif
 #endif
                 {
                     if((global_params.keep_all_cds || global_params.keep_cds_if_not_found) && q->has_cds()) {
@@ -379,7 +330,6 @@ int  run(){
         // MAIN LOOP
 
         std::vector<std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>> stats; // segment,query,template,score,notes
-        Finder* fndr = global_params.percent_ident>-1 ? transcriptome.get_aligner() : nullptr;
         CHAIN segments;
 
         for(int qi=0;qi<bundle_it->size();qi++){
@@ -400,7 +350,9 @@ int  run(){
                 std::string cur_seqid;
                 transcriptome.seqid2name(q->get_seqid(),cur_seqid);
 #ifndef DEBUG
-#pragma omp critical
+    #ifdef OPENMP_AVAILABLE
+        #pragma omp critical
+    #endif
 #endif
                 {
                     global_params.out_gtf_fp << q->str(cur_seqid) << std::endl;
@@ -554,11 +506,6 @@ int  run(){
                 segments.clear();
             }
 
-            // check percent identity if requested
-            if(global_params.percent_ident>-1) {
-                run_align(stats, fndr);
-            }
-
 #ifdef DEBUG
             if(std::strcmp(q->get_tid().c_str(),"CHS.34256.1")==0){ // rna-XM_011520617.2
                 std::cout<<"found"<<std::endl;
@@ -574,7 +521,9 @@ int  run(){
             transcriptome.seqid2name(q->get_seqid(),cur_seqid);
 
 #ifndef DEBUG
-#pragma omp critical
+    #ifdef OPENMP_AVAILABLE
+        #pragma omp critical
+    #endif
 #endif
             if(stats_flat.empty() || best_se.first<0){
                 // if requested keep_cds_if_not_found - handle here
@@ -725,11 +674,6 @@ int main(int argc, char** argv) {
     args.add_option("overhang",ArgParse::Type::INT,"If enabled, will also evaluate nucleotide sequence up and downstream up to N bases as set for the argument.",ArgParse::Level::GENERAL,false);
     args.add_option("spliced_overhang",ArgParse::Type::FLAG,"Only in effect when combined with the '--overhang' parameter. If enabled, this option will extend the sequence up to the '--overhang' number of bases, but terminate prematurely if either a splice donor (if extending towards 3') or splice acceptor (if extending towards 5') is detected.",ArgParse::GENERAL,false);
 
-    // Alignment
-    args.add_option("pi",ArgParse::Type::INT,"Percent identity between the query and template sequences. This option requires --reference parameter to be set. If enabled - will run alignment between passing pairs.", ArgParse::Level::GENERAL,false);
-    args.add_option("gapo",ArgParse::Type::INT,"Gap-open penalty", ArgParse::Level::GENERAL,false);
-    args.add_option("gape",ArgParse::Type::INT,"Gap-extension penalty", ArgParse::Level::GENERAL,false);
-
     args.add_positional_argument("templates", ArgParse::Type::STRING, "One or more GFF/GTF files with coding exons to be used as templates.", true, true);
 
     args.add_option("help", ArgParse::Type::FLAG, "Prints this help message.", ArgParse::Level::HELP, false);
@@ -849,17 +793,15 @@ int main(int argc, char** argv) {
     global_params.len_perc_ident = args.is_set("lpi") ? args.get_int("lpi") : def_params.len_perc_ident;
     global_params.len_frame_perc_ident = args.is_set("ilpi") ? args.get_int("ilpi") : def_params.len_frame_perc_ident;
     global_params.len_match_perc_ident = args.is_set("mlpi") ? args.get_int("mlpi") : def_params.len_match_perc_ident;
-    global_params.percent_ident = args.is_set("pi") ? args.get_int("pi") : def_params.percent_ident;
 
     global_params.overhang = args.is_set("overhang") ? args.get_int("overhang") : def_params.overhang;
     global_params.spliced_overhang = args.is_set("spliced_overhang") ? true : false;
 
-    global_params.gapo = args.is_set("gapo") ? args.get_int("gapo") : def_params.gapo;
-    global_params.gape = args.is_set("gape") ? args.get_int("gape") : def_params.gape;
-
     global_params.num_threads = args.is_set("threads") ? args.get_int("threads") : def_params.num_threads;
 #ifndef DEBUG
-    omp_set_num_threads(global_params.num_threads);
+    #ifdef OPENMP_AVAILABLE
+        omp_set_num_threads(global_params.num_threads);
+    #endif
 #endif
 
     if(args.is_set("use_id")){

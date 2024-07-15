@@ -713,9 +713,6 @@ void Transcriptome::set_ref(const std::string& rff){
 void Transcriptome::use_non_aug(){
     this->allow_non_aug=true;
 }
-void Transcriptome::set_aligner(const int8_t *mat, const int8_t *alphabet, int gapo, int gape){
-    this->aligner = Finder(mat,alphabet,gapo,gape);
-}
 void Transcriptome::load_seqids(GffReader& gffReader){
     for(int i=0;i<gffReader.gflst.Count();++i) {
         GffObj *pGffObj = gffReader.gflst.Get(i);

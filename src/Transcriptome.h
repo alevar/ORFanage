@@ -20,8 +20,6 @@
 #include <sstream>
 #include <set>
 
-#include "aln.hpp"
-
 class SEGTP{
 public:
     SEGTP() = default;
@@ -964,9 +962,6 @@ public:
     void correct_chain_len();
     int size(){return this->tx_vec.size();}
 
-    void set_aligner(const int8_t *mat,const int8_t *alphabet,int gapo,int gape);
-    Finder* get_aligner(){return &aligner;}
-
     // Main TX iterators
     typedef std::vector<TX>::iterator it;
     typedef std::vector<TX>::const_iterator cit;
@@ -998,9 +993,6 @@ private:
     std::vector<std::string> seqid_names;
     std::map<std::string,int> seqnames_ids;
     std::pair<std::map<std::string,int>::iterator,bool> n2i_it;
-
-    // Alignment
-    Finder aligner;
 
     bool allow_non_aug = false;
 };
