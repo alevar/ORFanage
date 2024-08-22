@@ -27,6 +27,7 @@ enum find_mode_t{
     LONGEST, // longest complete orf;
     LONGEST_MATCH, // default (highest number of inframe bases shared above thresholds) - if alignment specified - will be decided by alignment instead;
     BEST, // closest to the reference (even if not as long
+    FIRST, // most upstream ORF
 };
 
 std::string mode_to_str(const find_mode_t mode) noexcept{
@@ -46,6 +47,9 @@ std::string mode_to_str(const find_mode_t mode) noexcept{
             break;
         case BEST:
             mode_str = "BEST";
+            break;
+        case FIRST:
+            mode_str = "FIRST";
             break;
         default:
             std::cerr<<"invalid mode selected: "<<mode<<std::endl;
@@ -72,7 +76,7 @@ struct Parameters{
     int len_frame_perc_ident = -1; // percent identity by length of bases in frame of the reference transcript. If -1 (default) is set - the check will not be performed.
     int len_match_perc_ident = -1; // percent identity by length of bases that are in both query and reference. If -1 (default) is set - the check will not be performed.
     int cds_minlen = -1; // minimum length
-    std::vector<find_mode_t> mode_array{LONGEST_MATCH,BEST,START_MATCH,LONGEST,ALL}; // priority order of modes
+    std::vector<find_mode_t> mode_array{LONGEST_MATCH,BEST,START_MATCH,LONGEST,FIRST,ALL}; // priority order of modes
     int num_threads = 1;
 
     int overhang = 0;
@@ -130,6 +134,11 @@ bool score_lt(const Score& lhs, const Score& rhs){
                     return lhs.ilpi < rhs.ilpi;
                 }
                 break;
+            case FIRST:
+                if(lhs.query_start != rhs.query_start){
+                    return lhs.query_start > rhs.query_start; // here the gt is used since smaller query start is better (more upstream)
+                }
+                break;
             default:
                 std::cerr<<"wrong mode selected"<<std::endl;
                 exit(-1);
@@ -164,6 +173,11 @@ bool score_gt(const Score& lhs, const Score& rhs){
             case BEST: // PI if alignment enabled - otherwise ilpi
                 if(lhs.ilpi != rhs.ilpi){
                     return lhs.ilpi > rhs.ilpi;
+                }
+                break;
+            case FIRST:
+                if(lhs.query_start != rhs.query_start){
+                    return lhs.query_start < rhs.query_start; // here the lt is used since smaller query start is better (more upstream)
                 }
                 break;
             default:
@@ -662,7 +676,7 @@ int main(int argc, char** argv) {
     args.add_option("ilpi",ArgParse::Type::INT,"Percent identity by length of bases in frame of the reference transcript. If -1 (default) is set - the check will not be performed.",ArgParse::Level::GENERAL,false);
     args.add_option("mlpi",ArgParse::Type::INT,"Percent identity by length of bases that are in both query and reference. If -1 (default) is set - the check will not be performed.",ArgParse::Level::GENERAL,false);
     args.add_option("minlen",ArgParse::Type::INT,"Minimum length of an open reading frame to consider for the analysis",ArgParse::Level::GENERAL,false);
-    args.add_option("mode", ArgParse::Type::STRING, "Which CDS to report: ALL, LONGEST, LONGEST_MATCH, BEST, START_MATCH. Default: " + mode_to_str(global_params.mode_array.front()), ArgParse::Level::GENERAL, false);
+    args.add_option("mode", ArgParse::Type::STRING, "Which CDS to report: ALL, LONGEST, LONGEST_MATCH, FIRST, BEST, START_MATCH. Default: " + mode_to_str(global_params.mode_array.front()), ArgParse::Level::GENERAL, false);
     args.add_option("stats",ArgParse::Type::STRING,"Output a separate file with stats for each query/template pair",ArgParse::Level::GENERAL,false);
     args.add_option("threads",ArgParse::Type::INT,"Number of threads to run in parallel",ArgParse::Level::GENERAL,false);
     args.add_option("use_id",ArgParse::Type::FLAG,"If enabled, only transcripts with the same gene ID from the query file will be used to form a bundle. In this mode the same template transcript may be used in several bundles, if overlaps transcripts with different gene_ids.",ArgParse::Level::GENERAL,false);
@@ -776,8 +790,15 @@ int main(int argc, char** argv) {
             global_params.mode_array.push_back(START_MATCH);
             global_params.mode_array.push_back(LONGEST);
         }
+        else if (mode == "FIRST") {
+            global_params.mode_array.push_back(FIRST);
+            global_params.mode_array.push_back(BEST);
+            global_params.mode_array.push_back(LONGEST_MATCH);
+            global_params.mode_array.push_back(START_MATCH);
+            global_params.mode_array.push_back(LONGEST);
+        }
         else{
-            printf(OUT_ERROR "Please choose a valid mode (START_MATCH, ALL, LONGEST, LONGEST_MATCH, BEST)!\n" OUT_RESET);
+            printf(OUT_ERROR "Please choose a valid mode (START_MATCH, ALL, LONGEST, LONGEST_MATCH, FIRST, BEST)!\n" OUT_RESET);
             return -1;
         }
     }

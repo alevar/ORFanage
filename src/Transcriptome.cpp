@@ -616,6 +616,9 @@ Score TX::score(TX& t) {
     s.ilpi = 100.0 * ((float) s.num_bp_inframe / (float) s.ulen);
     s.mlpi = 100.0 * ((float) s.num_bp_match / (float) s.ulen);
 
+    // set query start relative to the transcript start
+    s.query_start = this->strand == '+' ? this->cds_start - this->exons.get_start() : this->exons.get_end() - this->cds_end;
+
     return s;
 }
 

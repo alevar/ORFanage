@@ -35,6 +35,9 @@ struct Score{
     int tlen = 0;
     int ulen = 0; // length of the union of query and tempalte chains
 
+    // query stats
+    int query_start = 0;
+
     bool start_match = 0;
     bool stop_match = 0;
 

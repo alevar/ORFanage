@@ -18,10 +18,15 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive -DNOCURL=1")
 if(CMAKE_BUILD_TYPE MATCHES Debug)
     add_compile_options("$<$<CONFIG:DEBUG>:-DDEBUG>")
     add_compile_options(-fsanitize=address)
-    add_compile_options(-fsanitize=leak)
     add_compile_options(-fsanitize=undefined)
+
+    # Conditionally exclude -fsanitize=leak on macOS with ARM64
+    if(NOT (APPLE AND CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64"))
+        add_compile_options(-fsanitize=leak)
+        add_link_options(-fsanitize=leak)
+    endif()
+
     add_link_options(-fsanitize=address)
-    add_link_options(-fsanitize=leak)
     add_link_options(-fsanitize=undefined)
 endif()
 
@@ -71,8 +76,6 @@ add_executable(orfanage
     ${gclib_SOURCE_DIR}/codons.cpp
     ${gclib_SOURCE_DIR}/gdna.h
     ${gclib_SOURCE_DIR}/gdna.cpp
-    ${gclib_SOURCE_DIR}/GStr.h
-    ${gclib_SOURCE_DIR}/GStr.cpp
     ${gclib_SOURCE_DIR}/GVec.hh
     ${gclib_SOURCE_DIR}/GList.hh
     ${gclib_SOURCE_DIR}/GHash.hh

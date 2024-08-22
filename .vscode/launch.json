@@ -1,0 +1,28 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Debug ORFanage",
+        "type": "lldb",  // Use the LLDB adapter
+        "request": "launch",
+        "program": "${workspaceFolder}/build/orfanage",
+        "args": [
+          "--query",
+          "${workspaceFolder}/example/patl.chess3.gtf",
+          "--output",
+          "${workspaceFolder}/example/patl.first.gtf",
+          "--mode","FIRST",
+          "--ilpi","50",
+          "--reference","${workspaceFolder}/example/chr11.fasta",
+          "${workspaceFolder}/example/patl.mane.gtf"
+        ],
+        "cwd": "${workspaceFolder}",
+        "stopOnEntry": false,
+        "externalConsole": false,
+        "preLaunchTask": "build ORFanage",
+        "postDebugTask": "",
+        "env": {}
+      }
+    ]
+  }
+  
