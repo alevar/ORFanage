@@ -11,10 +11,26 @@
           "${workspaceFolder}/example/patl.chess3.gtf",
           "--output",
           "${workspaceFolder}/example/patl.first.gtf",
-          "--mode","FIRST",
-          "--ilpi","50",
+          "--mode","BEST",
           "--reference","${workspaceFolder}/example/chr11.fasta",
           "${workspaceFolder}/example/patl.mane.gtf"
+        ],
+        "cwd": "${workspaceFolder}",
+        "stopOnEntry": false,
+        "externalConsole": false,
+        "preLaunchTask": "build ORFanage",
+        "postDebugTask": "",
+        "env": {}
+      },
+      {
+        "name": "Debug ORFanage-Stats",
+        "type": "lldb",  // Use the LLDB adapter
+        "request": "launch",
+        "program": "${workspaceFolder}/build/orfanage-stats",
+        "args": [
+          "--output","${workspaceFolder}/example/patl.stats.tsv",
+          "--query","${workspaceFolder}/example/patl.chess3.gtf",
+          "--template","${workspaceFolder}/example/patl.gencode.gtf"
         ],
         "cwd": "${workspaceFolder}",
         "stopOnEntry": false,

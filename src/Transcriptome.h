@@ -67,15 +67,15 @@ public:
     }
 
     friend std::ostream& operator<<(std::ostream& os, const SEGTP& s){
-        os << s.get_start() << "-" << s.get_end() << ":" << s.get_phase();
+        os << "[" << s.get_start() << "," << s.get_end() << "]";
         return os;
     };
 
     bool contains(uint pos) const {return pos>=this->start && pos<=this->end;}
     uint32_t get_start() const {return this->start;}
-    uint32_t get_start(bool strand){return strand=='+'?this->start:this->end;}
+    uint32_t get_start(char strand){return strand=='+'?this->start:this->end;}
     uint32_t get_end() const {return this->end;}
-    uint32_t get_end(bool strand){return strand=='+'?this->end:this->start       ;}
+    uint32_t get_end(char strand){return strand=='+'?this->end:this->start       ;}
     uint32_t get_phase() const {return this->phase;}
     uint32_t get_phase(uint pos, char strand) const {
 #ifdef DEBUG
@@ -142,6 +142,7 @@ public:
         if (this->end < s2.start || s2.end < this->start) {
             return false;
         }
+        return true;
     }
 
     bool operator== (const SEGTP& s) const{
@@ -173,6 +174,16 @@ public:
 
     CHAIN(CHAIN& ch) {this->chain = ch.chain;}
     CHAIN(const CHAIN& ch) {this->chain = ch.chain;}
+
+    // define method to be able to print chain to stdout
+    friend std::ostream& operator<<(std::ostream& os, const CHAIN& ch){
+        os << "[";
+        for(auto& c : ch.chain){
+            os << c << ",";
+        }
+        os << "]";
+        return os;
+    };
 
     bool operator== (const CHAIN& ch) const{
         if(this->chain==ch.chain){
@@ -230,7 +241,7 @@ public:
 
     uint16_t size() const {return this->chain.size();};
     SEGTP& operator[](int idx){return this->chain[idx];}
-    void push_back(SEGTP seg){this->chain.push_back(seg);}
+    void push_back(SEGTP seg){this->chain.emplace_back(seg);}
     void pop_back(){this->chain.pop_back();}
     SEGTP& back(){return this->chain.back();}
     int get_idx(int val){ // return the index of the segment containing a value or -1 if such is not found
@@ -549,16 +560,15 @@ public:
         for(auto v : t.chain){
             intervals.push_back(SEGTP(v.get_start(),v.get_end(),1));
         }
-        std::sort(intervals.begin(),intervals.end());
-
         if(intervals.size()==0){
             return;
         }
 
+        std::sort(intervals.begin(), intervals.end());
         res.push_back(intervals[0]);
 
         SEGTP left,inter,right,tmp;
-        for(int i=1;i<intervals.size();i++){
+        for (size_t i = 1; i < intervals.size(); ++i) {
             res.back().split(intervals[i],left,inter,right);
             if(!right.empty()){
 #ifdef DEBUG
@@ -952,7 +962,7 @@ public:
     }
     int seqid2name(int seqid,std::string& seqid_name);
     GFaSeqGet* get_fasta_seq(int seqid);
-    uint bundleup(bool use_id, uint32_t rescue_len,bool spliced_extend); // create bundles and return the total number of bundles
+    uint bundleup(bool use_id, uint32_t rescue_len=0,bool spliced_extend=false); // create bundles and return the total number of bundles
     void build_cds_chains();
     uint clean_short_orfs(int minlen);
     uint clean_cds(bool rescue, int extend_len, bool spliced_extend, bool use_id);

@@ -85,6 +85,7 @@ void TX::set_cds_as_exons(){
     }
 }
 void TX::build_cds(){
+    this->cds = CHAIN(); // reset the chain
     if(this->cds_start==0 && this->cds_end==0){ // cds has not been set
         return;
     }
@@ -570,7 +571,7 @@ Score TX::score(TX& t) {
     Score s;
     s.qlen = this->cds_len();
     s.tlen = t.cds_len();
-    CHAIN union_chain;\
+    CHAIN union_chain;
     s.ulen = this->cds.get_union(t.cds,union_chain);
 
     // 1. compute the total number of matching positions between query and template

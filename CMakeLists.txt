@@ -95,3 +95,34 @@ add_executable(orfanage
 target_link_libraries(orfanage z)
 
 install(TARGETS orfanage DESTINATION bin)
+
+add_executable(orfanage-stats
+    ${gclib_SOURCE_DIR}/gff.h
+    ${gclib_SOURCE_DIR}/gff.cpp
+    ${gclib_SOURCE_DIR}/GStr.h
+    ${gclib_SOURCE_DIR}/GStr.cpp
+    ${gclib_SOURCE_DIR}/GBase.h
+    ${gclib_SOURCE_DIR}/GBase.cpp
+    ${gclib_SOURCE_DIR}/codons.h
+    ${gclib_SOURCE_DIR}/codons.cpp
+    ${gclib_SOURCE_DIR}/gdna.h
+    ${gclib_SOURCE_DIR}/gdna.cpp
+    ${gclib_SOURCE_DIR}/GVec.hh
+    ${gclib_SOURCE_DIR}/GList.hh
+    ${gclib_SOURCE_DIR}/GHash.hh
+    ${gclib_SOURCE_DIR}/GFaSeqGet.h
+    ${gclib_SOURCE_DIR}/GFaSeqGet.cpp
+    ${gclib_SOURCE_DIR}/GFastaIndex.h
+    ${gclib_SOURCE_DIR}/GFastaIndex.cpp
+    ${gclib_SOURCE_DIR}/GFastaFile.h
+    ${CMAKE_SOURCE_DIR}/src/arg_parse.hpp
+    ${CMAKE_SOURCE_DIR}/src/Transcriptome.cpp
+    ${CMAKE_SOURCE_DIR}/src/Transcriptome.h
+    ${CMAKE_SOURCE_DIR}/src/common.hpp
+    ${CMAKE_SOURCE_DIR}/src/gff_utils.h
+    ${CMAKE_SOURCE_DIR}/src/gff_utils.cpp
+    ${CMAKE_SOURCE_DIR}/stats_main.cpp)
+
+target_link_libraries(orfanage-stats z)
+
+install(TARGETS orfanage-stats DESTINATION bin)
