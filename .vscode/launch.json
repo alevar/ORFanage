@@ -23,14 +23,15 @@
         "env": {}
       },
       {
-        "name": "Debug ORFanage-Stats",
+        "name": "Debug ORFcompare",
         "type": "lldb",  // Use the LLDB adapter
         "request": "launch",
-        "program": "${workspaceFolder}/build/orfanage-stats",
+        "program": "${workspaceFolder}/build/orfcompare",
         "args": [
           "--output","${workspaceFolder}/example/patl.stats.tsv",
           "--query","${workspaceFolder}/example/patl.chess3.gtf",
-          "--template","${workspaceFolder}/example/patl.gencode.gtf"
+          "--template","${workspaceFolder}/example/patl.gencode.gtf",
+          "--reference","${workspaceFolder}/example/chr11.fasta"
         ],
         "cwd": "${workspaceFolder}",
         "stopOnEntry": false,

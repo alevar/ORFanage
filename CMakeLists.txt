@@ -90,13 +90,13 @@ add_executable(orfanage
     ${CMAKE_SOURCE_DIR}/src/common.hpp
     ${CMAKE_SOURCE_DIR}/src/gff_utils.h
     ${CMAKE_SOURCE_DIR}/src/gff_utils.cpp
-    ${CMAKE_SOURCE_DIR}/main.cpp)
+    ${CMAKE_SOURCE_DIR}/orfanage.cpp)
 
 target_link_libraries(orfanage z)
 
 install(TARGETS orfanage DESTINATION bin)
 
-add_executable(orfanage-stats
+add_executable(orfcompare
     ${gclib_SOURCE_DIR}/gff.h
     ${gclib_SOURCE_DIR}/gff.cpp
     ${gclib_SOURCE_DIR}/GStr.h
@@ -121,8 +121,8 @@ add_executable(orfanage-stats
     ${CMAKE_SOURCE_DIR}/src/common.hpp
     ${CMAKE_SOURCE_DIR}/src/gff_utils.h
     ${CMAKE_SOURCE_DIR}/src/gff_utils.cpp
-    ${CMAKE_SOURCE_DIR}/stats_main.cpp)
+    ${CMAKE_SOURCE_DIR}/orfcompare.cpp)
 
-target_link_libraries(orfanage-stats z)
+target_link_libraries(orfcompare z)
 
-install(TARGETS orfanage-stats DESTINATION bin)
+install(TARGETS orfcompare DESTINATION bin)
