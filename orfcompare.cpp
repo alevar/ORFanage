@@ -173,7 +173,7 @@ int run(){
 }
 
 int main(int argc, char** argv) {
-    ArgParse args("orfanage-stats",
+    ArgParse args("orfcompare",
                   "run comparison of ORFs between two files.");
 
     args.add_option("query",ArgParse::Type::STRING, "Path to a GTF query file with transcripts to which CDSs are to be ported", ArgParse::Level::GENERAL,true);
@@ -189,7 +189,7 @@ int main(int argc, char** argv) {
     args.check_args();
 
     // first create the execution string
-    std::string cl = "orfanage-stats ";
+    std::string cl = "orfcompare ";
     for (int i = 0; i < argc; i++) {
         if (i == 0) {
             cl += argv[i];
