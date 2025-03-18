@@ -5,7 +5,7 @@ ORFanage: Ultra-efficient and sensitive method to search for ORFs in spliced gen
     :target: https://anaconda.org/bioconda/orfanage
     :alt: BioConda Install
 .. image:: https://img.shields.io/github/downloads/alevar/orfanage/total.svg
-    :target: https://github.com/cpockrandt/PhyloCSFpp/releases/latest
+    :target: https://github.com/alevar/ORFanage/releases/latest
     :alt: Github All Releases
 .. image:: https://readthedocs.org/projects/orfanage/badge/?version=latest
 	:target: http://orfanage.readthedocs.org/en/latest
