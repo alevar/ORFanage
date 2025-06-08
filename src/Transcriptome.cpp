@@ -620,6 +620,8 @@ Score TX::score(TX& t) {
     // set query start relative to the transcript start
     s.query_start = this->strand == '+' ? this->cds_start - this->exons.get_start() : this->exons.get_end() - this->cds_end;
 
+    s.start_match = this->strand == t.strand && (this->strand == '+' ? this->cds_start : this->cds_end) == (this->strand == '+' ? t.cds_start : t.cds_end);
+
     return s;
 }
 

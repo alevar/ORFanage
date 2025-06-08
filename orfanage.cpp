@@ -21,90 +21,134 @@
 #include "arg_parse.hpp"
 #include "Transcriptome.h"
 
-enum find_mode_t{
+namespace {
+    constexpr int MIN_CDS_LENGTH = 3;
+    constexpr int INVALID_COORDINATE = -1;
+}
+
+enum FindMode{
     START_MATCH, // if an ORF with a mathcing start codon is available - report it
     ALL, // report all complete orfs
     LONGEST, // longest complete orf;
     LONGEST_MATCH, // default (highest number of inframe bases shared above thresholds) - if alignment specified - will be decided by alignment instead;
     BEST, // closest to the reference (even if not as long
     FIRST, // most upstream ORF
+    INVALID // invalid mode, used for error handling
 };
 
-std::string mode_to_str(const find_mode_t mode) noexcept{
-    std::string mode_str;
-    switch (mode){
-        case START_MATCH:
-            mode_str = "MATCH_START";
-            break;
-        case ALL:
-            mode_str = "ALL";
-            break;
-        case LONGEST:
-            mode_str = "LONGEST";
-            break;
-        case LONGEST_MATCH:
-            mode_str = "LONGEST_MATCH";
-            break;
-        case BEST:
-            mode_str = "BEST";
-            break;
-        case FIRST:
-            mode_str = "FIRST";
-            break;
+std::string mode_to_string(FindMode mode) {
+    switch (mode) {
+        case FindMode::START_MATCH:    return "START_MATCH";
+        case FindMode::ALL:            return "ALL";
+        case FindMode::LONGEST:        return "LONGEST";
+        case FindMode::LONGEST_MATCH:  return "LONGEST_MATCH";
+        case FindMode::BEST:           return "BEST";
+        case FindMode::FIRST:          return "FIRST";
         default:
-            std::cerr<<"invalid mode selected: "<<mode<<std::endl;
-            exit(-7);
+            throw std::runtime_error("Invalid mode selected: " + std::to_string(static_cast<int>(mode)));
     }
-    return mode_str;
 }
 
-struct DEFAULTS{
-    int len_perc_ident = -1; // percent identity by length between the original and reference transcripts. If -1 (default) is set - the check will not be performed.
-    int len_frame_perc_ident = -1; // percent identity by length of bases in frame of the reference transcript. If -1 (default) is set - the check will not be performed.
-    int len_match_perc_ident = -1; // percent identity by length of bases that are in both query and reference. If -1 (default) is set - the check will not be performed.
-    int cds_minlen = -1; // minimum length
+std::string modeArray_to_string(const std::vector<FindMode>& modes) {
+    std::string result;
+    for (const auto& mode : modes) {
+        if (!result.empty()) {
+            result += ",";
+        }
+        result += mode_to_string(mode);
+    }
+    return result;
+}
+
+FindMode string_to_mode(std::string mode_string){
+    if (mode_string == "START_MATCH") {
+        return FindMode::START_MATCH;
+    } else if (mode_string == "ALL") {
+        return FindMode::ALL;
+    } else if (mode_string == "LONGEST") {
+        return FindMode::LONGEST;
+    } else if (mode_string == "LONGEST_MATCH") {
+        return FindMode::LONGEST_MATCH;
+    } else if (mode_string == "BEST") {
+        return FindMode::BEST;
+    } else if (mode_string == "FIRST") {
+        return FindMode::FIRST;
+    } else {
+        return FindMode::INVALID;
+    }
+}
+
+struct DefaultParameters{
+    int len_perc_ident = -1;
+    int len_frame_perc_ident = -1;
+    int len_match_perc_ident = -1;
+    int cds_minlen = -1;
     int num_threads = 1;
-
     int overhang = 0;
-} def_params;
+};
 
-struct Parameters{
+struct GlobalParameters{
+    // Flags
     bool clean_query = false;
     bool clean_templ = false;
     bool rescue = false;
-    int len_perc_ident = -1; // percent identity by length between the original and reference transcripts. If -1 (default) is set - the check will not be performed.
-    int len_frame_perc_ident = -1; // percent identity by length of bases in frame of the reference transcript. If -1 (default) is set - the check will not be performed.
-    int len_match_perc_ident = -1; // percent identity by length of bases that are in both query and reference. If -1 (default) is set - the check will not be performed.
-    int cds_minlen = -1; // minimum length
-    std::vector<find_mode_t> mode_array{LONGEST_MATCH,BEST,START_MATCH,LONGEST,FIRST,ALL}; // priority order of modes
-    int num_threads = 1;
-
-    int overhang = 0;
+    bool use_id = false;
+    bool non_aug = false;
+    bool seleno = false;  // TODO: implement selenocysteine support
+    bool keep_all_cds = false;
+    bool keep_cds_if_not_found = false;
     bool spliced_overhang = false;
 
+    // Thresholds
+    int len_perc_ident = -1;
+    int len_frame_perc_ident = -1;
+    int len_match_perc_ident = -1;
+    int cds_minlen = -1;
+    int overhang = 0;
+    int num_threads = 1;
+
+    // Mode priority order
+    std::vector<FindMode> mode_array{
+        FindMode::LONGEST_MATCH, FindMode::BEST, FindMode::START_MATCH,
+        FindMode::LONGEST, FindMode::FIRST, FindMode::ALL
+    };
+
+    // File paths
     std::string reference_fasta_fname;
     std::string query_fname;
-    std::vector<std::string> template_fnames = {};
-
+    std::vector<std::string> template_fnames;
     std::string output_fname;
     std::string stats_fname;
 
+    // File streams
     std::ofstream stats_fp;
     std::ofstream out_gtf_fp;
 
-    bool use_id = false; // if enabled will use query gene ids to form bundles. the same reference id may be evaluated in multiple bundles if overlaps queries with different gene ids
-    bool non_aug = false; // If enabled, non-AUG start codons in reference transcripts will not be discarded and will be considered in overlapping query transcripts on equal grounds with the AUG start codon.
-    // TODO: seleno
-    bool seleno = false; // If enabled, all premature stop codons in the reference will be treated as selenocysteine instead and if matched in query - will be retained, but only if the exact position is matched in the same frame.
-    bool keep_all_cds = false; // If enabled, any CDS already present in the query will be kept unmodified
-    bool keep_cds_if_not_found = false; // if enabled CDS present in query transcripts when no ORF can be detected will be preserved.
-} global_params;
+    bool are_mutually_exclusive_flags_set() const {
+        return keep_all_cds && keep_cds_if_not_found;
+    }
 
-struct RunStats{
-    uint num_too_short = 0; // number of template isoforms with ORF that is too short
-    uint num_dirty = 0; // number of template isoforms with incorrect/unsuitable ORFs (other than short)
-    uint template_duplicates = 0; // number of duplcate ORFs discarded
-} rstats;
+    bool requires_reference() const {
+        return clean_templ || clean_query || rescue;
+    }
+};
+
+struct RunStatistics{
+    uint num_too_short = 0;
+    uint num_dirty = 0;
+    uint template_duplicates = 0;
+
+    void print_summary() const {
+        std::cerr << "Run Statistics:" << std::endl;
+        std::cerr << "  Too short: " << num_too_short << std::endl;
+        std::cerr << "  Dirty: " << num_dirty << std::endl;
+        std::cerr << "  Template duplicates: " << template_duplicates << std::endl;
+    }
+};
+
+DefaultParameters default_params;
+GlobalParameters global_params;
+RunStatistics run_stats;
 
 bool score_lt(const Score& lhs, const Score& rhs){
     if(lhs.pass!=rhs.pass){
@@ -140,8 +184,7 @@ bool score_lt(const Score& lhs, const Score& rhs){
                 }
                 break;
             default:
-                std::cerr<<"wrong mode selected"<<std::endl;
-                exit(-1);
+                throw std::runtime_error("Invalid mode set: " + mode_to_string(m));
         }
     }
     return lhs.tlen < rhs.tlen;
@@ -181,8 +224,7 @@ bool score_gt(const Score& lhs, const Score& rhs){
                 }
                 break;
             default:
-                std::cerr<<"wrong mode selected"<<std::endl;
-                exit(-1);
+                throw std::runtime_error("Invalid mode set: " + mode_to_string(m));
         }
     }
     return lhs.tlen > rhs.tlen;
@@ -255,14 +297,14 @@ int  run(){
     }
 
     if(global_params.clean_templ) {
-        rstats.num_too_short = transcriptome.clean_short_orfs(global_params.cds_minlen);
+        run_stats.num_too_short = transcriptome.clean_short_orfs(global_params.cds_minlen);
     }
 
     std::cerr<<"sorting reference transcriptome"<<std::endl;
     transcriptome.sort();
 
     if(global_params.clean_templ) {
-        rstats.num_dirty = transcriptome.clean_cds(global_params.rescue,global_params.overhang, global_params.spliced_overhang, global_params.use_id); // TODO: if we load sequence data into bundles - this is not cost effective...
+        run_stats.num_dirty = transcriptome.clean_cds(global_params.rescue,global_params.overhang, global_params.spliced_overhang, global_params.use_id); // TODO: if we load sequence data into bundles - this is not cost effective...
     }
 
     transcriptome.set_cds_as_exons();
@@ -272,7 +314,7 @@ int  run(){
     transcriptome.sort();
 
     std::cerr<<"start removing duplicates"<<std::endl;
-    rstats.template_duplicates = transcriptome.deduplicate(global_params.use_id);
+    run_stats.template_duplicates = transcriptome.deduplicate(global_params.use_id);
 
     std::cerr<<"loading query transcriptome"<<std::endl;
 
@@ -676,7 +718,9 @@ int main(int argc, char** argv) {
     args.add_option("ilpi",ArgParse::Type::INT,"Percent identity by length of bases in frame of the reference transcript. If -1 (default) is set - the check will not be performed.",ArgParse::Level::GENERAL,false);
     args.add_option("mlpi",ArgParse::Type::INT,"Percent identity by length of bases that are in both query and reference. If -1 (default) is set - the check will not be performed.",ArgParse::Level::GENERAL,false);
     args.add_option("minlen",ArgParse::Type::INT,"Minimum length of an open reading frame to consider for the analysis",ArgParse::Level::GENERAL,false);
-    args.add_option("mode", ArgParse::Type::STRING, "Which CDS to report: ALL, LONGEST, LONGEST_MATCH, FIRST, BEST, START_MATCH. Default: " + mode_to_str(global_params.mode_array.front()), ArgParse::Level::GENERAL, false);
+    
+    args.add_option("mode", ArgParse::Type::STRING, "Strategy to select the CDS for transcripts: ALL, LONGEST, LONGEST_MATCH, FIRST, BEST, START_MATCH. A cascading array of modes can be provided as a comma-separated list to resolve ties or issues in CDS selection (eg. two candidate ORFs have the longest length, mode selection falls back from LONGEST to BEST. Or START_MATCH fails to match and falls back to FIRST or BEST). Default: " + modeArray_to_string(global_params.mode_array) + ".", ArgParse::Level::GENERAL, false);
+    
     args.add_option("stats",ArgParse::Type::STRING,"Output a separate file with stats for each query/template pair",ArgParse::Level::GENERAL,false);
     args.add_option("threads",ArgParse::Type::INT,"Number of threads to run in parallel",ArgParse::Level::GENERAL,false);
     args.add_option("use_id",ArgParse::Type::FLAG,"If enabled, only transcripts with the same gene ID from the query file will be used to form a bundle. In this mode the same template transcript may be used in several bundles, if overlaps transcripts with different gene_ids.",ArgParse::Level::GENERAL,false);
@@ -709,8 +753,7 @@ int main(int argc, char** argv) {
     // check that all files exist
     global_params.query_fname = args.get_string("query");
     if(!file_exists(global_params.query_fname)){
-        std::cerr << "Input file does not exist! "<<args.get_string("query")<<std::endl;
-        exit(2);
+        throw std::runtime_error("Input file does not exist: " + args.get_string("query"));
     }
 
     // run for every gff file
@@ -718,16 +761,14 @@ int main(int argc, char** argv) {
         std::string templ_fname = args.get_positional_argument(i);
         global_params.template_fnames.push_back(templ_fname);
         if (!file_exists(templ_fname)) {
-            std::cerr << "Template file does not exist! " << templ_fname << std::endl;
-            exit(2);
+            throw std::runtime_error("Template file does not exist: " + templ_fname);
         }
     }
 
     if(args.is_set("reference")){ // much from gpertea bamcons.cpp
         global_params.reference_fasta_fname = args.get_string("reference");
         if(!file_exists(global_params.reference_fasta_fname)){
-            std::cerr << "Reference FASTA file does not exist!\n";
-            exit(2);
+            throw std::runtime_error("Reference FASTA file does not exist: " + global_params.reference_fasta_fname);
         }
 
         // get potential fasta index file name
@@ -737,17 +778,14 @@ int main(int argc, char** argv) {
             std::cerr<<"No fasta index found for "<<fa_idx_fname<<". Building now"<<std::endl;
             faIdx.buildIndex();
             if (faIdx.getCount() == 0){
-                std::cerr<<"Error: no fasta records found!"<<std::endl;
-                exit(2);
+                throw std::runtime_error("No fasta records found in the reference file: " + global_params.reference_fasta_fname);
             }
             FILE* fcreate = fopen(fa_idx_fname.c_str(), "w");
             if (fcreate == nullptr){
-                std::cerr<<"Error: cannot create fasta index: "<<fa_idx_fname<<std::endl;
-                exit(2);
+                throw std::runtime_error("Cannot create fasta index: " + fa_idx_fname);
             }
             if (faIdx.storeIndex(fcreate) < faIdx.getCount()){
-                std::cerr<<"Warning: error writing the index file!"<<std::endl;
-                exit(2);
+                throw std::runtime_error("Error writing the fasta index file: " + fa_idx_fname);
             }
             std::cerr<<"FASTA index rebuilt."<<std::endl;
         }
@@ -756,50 +794,29 @@ int main(int argc, char** argv) {
     if (args.is_set("mode")){
         global_params.mode_array.clear();
 
-        std::string mode = args.get_string("mode");
-        std::transform(mode.begin(), mode.end(), mode.begin(), toupper);
+        std::string mode_string = args.get_string("mode");
+        std::stringstream ss(mode_string);
+        std::string mode;
 
-        if (mode == "LONGEST") {
-            global_params.mode_array.push_back(LONGEST);
-            global_params.mode_array.push_back(LONGEST_MATCH);
-            global_params.mode_array.push_back(BEST);
-            global_params.mode_array.push_back(START_MATCH);
-        }
-        else if (mode == "START_MATCH") {
-            global_params.mode_array.push_back(START_MATCH);
-            global_params.mode_array.push_back(LONGEST);
-            global_params.mode_array.push_back(LONGEST_MATCH);
-            global_params.mode_array.push_back(BEST);
-        }
-        else if (mode == "ALL"){
-            global_params.mode_array.push_back(ALL);
-            global_params.mode_array.push_back(LONGEST_MATCH);
-            global_params.mode_array.push_back(BEST);
-            global_params.mode_array.push_back(LONGEST);
-            global_params.mode_array.push_back(START_MATCH);
-        }
-        else if (mode == "LONGEST_MATCH") {
-            global_params.mode_array.push_back(LONGEST_MATCH);
-            global_params.mode_array.push_back(BEST);
-            global_params.mode_array.push_back(START_MATCH);
-            global_params.mode_array.push_back(LONGEST);
-        }
-        else if (mode == "BEST") {
-            global_params.mode_array.push_back(BEST);
-            global_params.mode_array.push_back(LONGEST_MATCH);
-            global_params.mode_array.push_back(START_MATCH);
-            global_params.mode_array.push_back(LONGEST);
-        }
-        else if (mode == "FIRST") {
-            global_params.mode_array.push_back(FIRST);
-            global_params.mode_array.push_back(BEST);
-            global_params.mode_array.push_back(LONGEST_MATCH);
-            global_params.mode_array.push_back(START_MATCH);
-            global_params.mode_array.push_back(LONGEST);
-        }
-        else{
-            printf(OUT_ERROR "Please choose a valid mode (START_MATCH, ALL, LONGEST, LONGEST_MATCH, FIRST, BEST)!\n" OUT_RESET);
-            return -1;
+        while (std::getline(ss, mode, ',')) {
+            // Trim whitespace
+            mode.erase(mode.begin(), std::find_if(mode.begin(), mode.end(), [](unsigned char ch) {
+                return !std::isspace(ch);
+            }));
+            mode.erase(std::find_if(mode.rbegin(), mode.rend(), [](unsigned char ch) {
+                return !std::isspace(ch);
+            }).base(), mode.end());
+        
+            // Convert to uppercase
+            std::transform(mode.begin(), mode.end(), mode.begin(), ::toupper);
+
+            FindMode mode_code = string_to_mode(mode);
+            if (mode_code == FindMode::INVALID) {
+                throw std::runtime_error("Invalid mode specified: " + mode);
+            }
+            else {
+                global_params.mode_array.push_back(mode_code);
+            }
         }
     }
 
@@ -810,15 +827,15 @@ int main(int argc, char** argv) {
         assert(args.is_set("reference"));
     }
 
-    global_params.cds_minlen = args.is_set("minlen") ? args.get_int("minlen") : def_params.cds_minlen;
-    global_params.len_perc_ident = args.is_set("lpi") ? args.get_int("lpi") : def_params.len_perc_ident;
-    global_params.len_frame_perc_ident = args.is_set("ilpi") ? args.get_int("ilpi") : def_params.len_frame_perc_ident;
-    global_params.len_match_perc_ident = args.is_set("mlpi") ? args.get_int("mlpi") : def_params.len_match_perc_ident;
+    global_params.cds_minlen = args.is_set("minlen") ? args.get_int("minlen") : default_params.cds_minlen;
+    global_params.len_perc_ident = args.is_set("lpi") ? args.get_int("lpi") : default_params.len_perc_ident;
+    global_params.len_frame_perc_ident = args.is_set("ilpi") ? args.get_int("ilpi") : default_params.len_frame_perc_ident;
+    global_params.len_match_perc_ident = args.is_set("mlpi") ? args.get_int("mlpi") : default_params.len_match_perc_ident;
 
-    global_params.overhang = args.is_set("overhang") ? args.get_int("overhang") : def_params.overhang;
+    global_params.overhang = args.is_set("overhang") ? args.get_int("overhang") : default_params.overhang;
     global_params.spliced_overhang = args.is_set("spliced_overhang") ? true : false;
 
-    global_params.num_threads = args.is_set("threads") ? args.get_int("threads") : def_params.num_threads;
+    global_params.num_threads = args.is_set("threads") ? args.get_int("threads") : default_params.num_threads;
 #ifndef DEBUG
     #ifdef OPENMP_AVAILABLE
         omp_set_num_threads(global_params.num_threads);
@@ -841,8 +858,7 @@ int main(int argc, char** argv) {
     }
 
     if (global_params.keep_all_cds && global_params.keep_cds_if_not_found){
-        std::cerr<<"'--keep_all_cds' and '--keep_cds_if_not_found' are mutually exclusive flags. Please choose one or the other"<<std::endl;
-        exit(1);
+        throw std::runtime_error("Mutually exclusive flags: '--keep_all_cds' and '--keep_cds_if_not_found'");
     }
 
     global_params.output_fname = args.get_string("output");
