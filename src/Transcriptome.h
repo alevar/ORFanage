@@ -67,7 +67,7 @@ public:
     }
 
     friend std::ostream& operator<<(std::ostream& os, const SEGTP& s){
-        os << "[" << s.get_start() << "," << s.get_end() << "]";
+        os << s.get_start() << "-" << s.get_end();
         return os;
     };
 
