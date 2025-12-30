@@ -1,0 +1,17 @@
+Column,Description,Example 1,Example 2,Example 3
+query_id,"Transcript ID of the query transcript.",CHS.8812.2,CHS.8812.5,CHS.8812.6
+template_id,"Transcript ID of the template transcript. '-' if no overlapping template.",ENST00000300146.10,ENST00000300146.10,-
+query_len,"Length of the query CDS in nucleotides (bp).",1566,2310,2223
+template_len,"Length of the template CDS in nucleotides (bp).",2313,2313,-
+len_match,"Number of nucleotides overlapping between query and template CDS.",1566,2310,-
+len_inframe,"Number of overlapping nucleotides in the same reading frame as template.",1566,2310,-
+len_outframe,"Number of overlapping nucleotides out of frame relative to template.",0,0,-
+len_extra,"Nucleotides in query CDS extending beyond template CDS boundaries.",0,0,-
+len_missing,"Nucleotides from template CDS not covered by query CDS.",747,3,-
+lpi,"Length Percent Identity: 100 * query_len / union_len.",92.5532,99.8703,-
+mlpi,"Match Length Percent Identity: 100 * len_match / union_len.",92.5532,99.8703,-
+ilpi,"In-frame Length Percent Identity: 100 * len_inframe / union_len.",92.5532,99.8703,-
+query_start_codon,"Amino acid at query CDS start position (requires --reference). 'M' for methionine.",M,M,-
+template_start_codon,"Amino acid at template CDS start position (requires --reference).",M,M,-
+query_stop_codon,"Amino acid at query CDS end position (requires --reference). '.' for stop codon.",.,R,-
+template_stop_codon,"Amino acid at template CDS end position (requires --reference).",.,.,- 

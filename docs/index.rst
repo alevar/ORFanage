@@ -46,7 +46,8 @@ The User Guide
    :maxdepth: 2
 
    user/install
-   user/quickstart
+   user/orfanage
+   user/orfcompare
    user/file_formats
    user/examples
    user/contact

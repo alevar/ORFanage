@@ -1,18 +1,22 @@
-query_id,rna-NR_121609.1,rna-NM_001363968.1,rna-NM_001363968.1,rna-NM_001363968.1,rna-XM_011512790.1
-template_id,-,ENST00000643695.2,ENST00000643695.2,ENST00000643695.2,ENST00000643695.2
-segment,-,139561010-139561392:4294967295,139573598-139579055:4294967295,139627616-139627724:4294967295,139561010-139579055:4294967295
-notes,-,gtf,-,dup,gtf
-query_len,-,393,513,513,648
-template_len,-,1041,1041,1041,1041
-pass,-,1,1,0,1
-len_match,-,383,386,386,648
-len_inframe,-,383,376,376,648
-len_outframe,-,0,10,10,0
-len_extra,-,10,127,127,0
-len_missing,-,658,655,655,393
-length_pd,-,37.7522,49.2795,49.2795,62.2478
-match_length_pd,-,36.7915,37.0797,37.0797,62.2478
-inframe_length_pd,-,36.7915,36.1191,36.1191,62.2478
-alignment_match,-,0,0,0,0
-pi,-,0,0,0,0
-ppp_score,-,0,0,0,0
+Column,Description,Example 1,Example 2,Example 3,Example 4,Example 5
+query_id,"Transcript ID of the query transcript. In ALL mode may include CDS coordinates.",rna-NR_121609.1,rna-NM_001363968.1,rna-NM_001363968.1,rna-NM_001363968.1,rna-XM_011512790.1
+template_id,"Transcript ID of the template (reference) transcript. '-' if no template found.",-,ENST00000643695.2,ENST00000643695.2,ENST00000643695.2,ENST00000643695.2
+segment,"Genomic coordinates of the CDS segment in format start-end.",-,139561010-139561392,139573598-139579055,139627616-139627724,139561010-139579055
+notes,"Status annotation: best_gtf, gtf, dup, keep_cds, no-overlap, segment_len<3, cds_len<3.",-,gtf,-,dup,gtf
+num_templates,"Number of template transcripts contributing to this ORF annotation.",-,1,1,1,1
+query_len,"Length of the query CDS in nucleotides (bp).",-,393,513,513,648
+template_len,"Length of the template CDS in nucleotides (bp).",-,1041,1041,1041,1041
+union_len,"Length of the union of query and template CDS chains in nucleotides.",-,1051,1168,1168,1041
+pass,"Boolean (0/1) indicating if candidate CDS passed all filtering criteria.",-,1,1,0,1
+len_match,"Number of nucleotides overlapping between query and template CDS.",-,383,386,386,648
+len_inframe,"Number of overlapping nucleotides in the same reading frame as template.",-,383,376,376,648
+len_outframe,"Number of overlapping nucleotides out of frame relative to template.",-,0,10,10,0
+len_extra,"Nucleotides in query CDS extending beyond template CDS boundaries.",-,10,127,127,0
+len_missing,"Nucleotides from template CDS not covered by query CDS.",-,658,655,655,393
+length_pi,"Length Percent Identity: 100 * query_len / union_len.",-,37.7522,49.2795,49.2795,62.2478
+match_length_pi,"Match Length Percent Identity: 100 * len_match / union_len. Measures actual overlap between query and template CDS accepting both in and out of frame matching positions.",-,36.7915,37.0797,37.0797,62.2478
+inframe_length_pi,"In-frame Length Percent Identity: 100 * len_inframe / union_len. Measures overlap maintaining correct reading frame.",-,36.7915,36.1191,36.1191,62.2478
+alignment_match,"Nucleotides with identical sequence (requires --reference for alignment).",-,0,0,0,0
+start_match,"Boolean (0/1) if query start codon matches template start codon position.",-,0,0,0,0
+stop_match,"Boolean (0/1) if query stop codon matches template stop codon position.",-,0,0,0,0
+pi,"Sequence-level percent identity from alignment (requires --reference).",-,0,0,0,0
