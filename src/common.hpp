@@ -479,12 +479,10 @@ private:
 
 #ifdef DEBUG
         if(((end_pos+1)-start_pos)%3!=0){
-            std::cerr<<"cannot translate sequence of length%3!=0"<<std::endl;
-            exit(-1);
+            throw std::runtime_error("Cannot translate sequence of length % 3 != 0");
         }
         if(nts.size()==0 || (end_pos+1)-start_pos==0){
-            std::cerr<<"cannot translate empty sequence"<<std::endl;
-            exit(-1);
+            throw std::runtime_error("Cannot translate empty sequence");
         }
         assert(end_pos+1<=nts.size());
 #endif

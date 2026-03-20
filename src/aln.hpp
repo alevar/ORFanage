@@ -53,8 +53,7 @@ public:
             else if (opcode == CMATCH)
                 break;
             else{
-                std::cerr << "unidentified cigar operation\n";
-                exit(3);
+                throw std::runtime_error("Unidentified cigar operation");
             }
         }
 
@@ -73,8 +72,7 @@ public:
             else if (opcode == CDEL)
                 cur_pos_t += oplen;
             else{
-                std::cerr << "unidentified cigar operation\n";
-                exit(3);
+                throw std::runtime_error("Unidentified cigar operation");
             }
         }
 
@@ -130,8 +128,7 @@ public:
                     ++cur_pos_t;
                 }
                 else{
-                    std::cerr << "unidentified cigar operation\n";
-                    exit(3);
+                    throw std::runtime_error("Unidentified cigar operation");
                 }
             }
         }

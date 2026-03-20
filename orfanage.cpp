@@ -232,22 +232,22 @@ bool score_gt(const Score& lhs, const Score& rhs){
 
 // groups duplicate ORFs and selects representative template (maximizing score within each group)
 // returns map of start/end coordinates as keys to a vector of query/template pairs with scores
-std::map<std::pair<int,int>,std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>> flatten(std::vector<std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>>& stats){
-    std::map<std::pair<int,int>,std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>> flat;
-    std::pair<std::map<std::pair<int,int>,std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>>::iterator,bool> fit;
+std::map<std::pair<int,int>,std::vector<std::tuple<SEGTP,TX,const TX*,Score,std::string>>> flatten(std::vector<std::vector<std::tuple<SEGTP,TX,const TX*,Score,std::string>>>&& stats){
+    std::map<std::pair<int,int>,std::vector<std::tuple<SEGTP,TX,const TX*,Score,std::string>>> flat;
+    std::pair<std::map<std::pair<int,int>,std::vector<std::tuple<SEGTP,TX,const TX*,Score,std::string>>>::iterator,bool> fit;
     for(auto& grp : stats){
         for(auto& sub : grp){
             int start = std::get<1>(sub).get_cds_start();
             int end = std::get<1>(sub).get_cds_end();
             std::pair<int,int> key = std::make_pair(start,end);
 
-            fit = flat.insert(std::make_pair(key,std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>{}));
-            fit.first->second.emplace_back(sub);
+            fit = flat.insert(std::make_pair(key,std::vector<std::tuple<SEGTP,TX,const TX*,Score,std::string>>{}));
+            fit.first->second.emplace_back(std::move(sub));
         }
     }
     // sort each vector of transcripts by score
     for(auto& kv : flat){
-        std::sort(kv.second.begin(),kv.second.end(), [ ]( const std::tuple<SEGTP,TX,TX,Score,std::string>& lhs, const std::tuple<SEGTP,TX,TX,Score,std::string>& rhs )
+        std::sort(kv.second.begin(),kv.second.end(), [ ]( const std::tuple<SEGTP,TX,const TX*,Score,std::string>& lhs, const std::tuple<SEGTP,TX,const TX*,Score,std::string>& rhs )
         {
             return score_gt(std::get<3>(lhs),std::get<3>(rhs));
         });
@@ -256,7 +256,7 @@ std::map<std::pair<int,int>,std::vector<std::tuple<SEGTP,TX,TX,Score,std::string
 }
 
 // returns -1,-1 if nothing passing has been found
-std::pair<int,int> find_best_stat(std::map<std::pair<int,int>,std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>>& stats_flat){
+std::pair<int,int> find_best_stat(std::map<std::pair<int,int>,std::vector<std::tuple<SEGTP,TX,const TX*,Score,std::string>>>& stats_flat){
     std::pair<int,int> best_se = stats_flat.begin()->first;
     Score best_score = std::get<3>(stats_flat.begin()->second.front());
     for(auto& kv : stats_flat){
@@ -385,7 +385,7 @@ int  run(){
 
         // MAIN LOOP
 
-        std::vector<std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>> stats; // segment,query,template,score,notes
+        std::vector<std::vector<std::tuple<SEGTP,TX,const TX*,Score,std::string>>> stats; // segment,query,template,score,notes
         CHAIN segments;
 
         for(int qi=0;qi<bundle_it->size();qi++){
@@ -441,10 +441,13 @@ int  run(){
             for(int ti=0;ti<bundle_it->size();ti++){
                 t=bundle_it->operator[](ti);
                 if(!t->is_template()){continue;}
+                // FAST BOUNDING BOX CHECK to prevent mega-bundle quadratics
+                if(q->get_start() > t->get_cds_end() || q->get_end() < t->get_cds_start()) continue;
+
                 int intlen = q->exon_chain()->intersection(*t->cds_chain(),segments,true);
-                stats.push_back(std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>{});
+                stats.push_back(std::vector<std::tuple<SEGTP,TX,const TX*,Score,std::string>>{});
                 if(intlen==0){
-                    stats.back().push_back(std::make_tuple(SEGTP(),*q,*t,Score(),"no-overlap")); // empty score
+                    stats.back().push_back(std::make_tuple(SEGTP(),*q,t,Score(),"no-overlap")); // empty score
                     std::get<3>(stats.back().back()).pass = false;
                     continue;
                 }
@@ -454,7 +457,7 @@ int  run(){
 
                 // now we need to reconstruct a transcript within the query exon chain for each segment of the template ORF
                 for(auto& s : segments){
-                    stats.back().push_back(std::make_tuple(s,*q,*t,Score(),"-"));
+                    stats.back().push_back(std::make_tuple(s,*q,t,Score(),"-"));
                     // TODO: does it work without sequence avaialble?
 
 #ifdef DEBUG
@@ -568,7 +571,7 @@ int  run(){
             }
 #endif
             // flatten out the results
-            std::map<std::pair<int,int>,std::vector<std::tuple<SEGTP,TX,TX,Score,std::string>>> stats_flat = flatten(stats); // key: cds start/end; value: segment, query, templates, score, notes
+            std::map<std::pair<int,int>,std::vector<std::tuple<SEGTP,TX,const TX*,Score,std::string>>> stats_flat = flatten(std::move(stats)); // key: cds start/end; value: segment, query, templates, score, notes
 
             // find best CDS
             std::pair<int,int> best_se = find_best_stat(stats_flat);
@@ -627,7 +630,7 @@ int  run(){
                         }
                         if(kv.second.size()>1){
                             for(auto v=kv.second.begin();v!=kv.second.end();v++){
-                                first_kv.merge(std::get<2>(*v)); // merge into best
+                                first_kv.merge(*(std::get<2>(*v))); // merge into best
                             }
                         }
 
@@ -661,7 +664,7 @@ int  run(){
 
                     if(sfit->second.size()>1){
                         for(auto v=sfit->second.begin()+1;v!=sfit->second.end();v++){
-                            frontq.merge(std::get<2>(*v)); // merge into best
+                            frontq.merge(*(std::get<2>(*v))); // merge into best
                         }
                     }
 
@@ -683,7 +686,7 @@ int  run(){
 
                     for(auto& v : kv.second){ // for every segment
                         global_params.stats_fp<<tid<<"\t" // query
-                                              <<std::get<2>(v).get_tid()<<"\t" // template
+                                              <<std::get<2>(v)->get_tid()<<"\t" // template
                                               <<std::get<0>(v)<<"\t" // segment
                                               <<std::get<4>(v)<<"\t" // notes
                                               <<std::get<1>(v).num_dups()+1<<"\t" // number of duplciates represented by the current ORF
@@ -736,10 +739,10 @@ int main(int argc, char** argv) {
 
     args.add_option("help", ArgParse::Type::FLAG, "Prints this help message.", ArgParse::Level::HELP, false);
 
-    args.parse_args(argc, argv);
-    args.check_args();
-
     try {
+        args.parse_args(argc, argv);
+        args.check_args();
+
         // first create the execution string
     std::string cl = "orfanage ";
     for (int i = 0; i < argc; i++) {

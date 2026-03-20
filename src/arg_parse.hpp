@@ -6,6 +6,7 @@
 
 #include <cassert>
 #include <string.h>
+#include <stdexcept>
 
 #include <string>
 #include <vector>
@@ -83,10 +84,10 @@ private:
         return it;
     }
 
-    void error_message(std::string && msg) const
+    [[noreturn]] void error_message(std::string && msg) const
     {
-        printf(OUT_ERROR "ERROR: %s\n" OUT_RESET, msg.c_str());
-        printf("Run `%s --help` for more information!\n", program_name.c_str());
+        std::string err = "ERROR: " + msg + "\nRun `" + program_name + " --help` for more information!";
+        throw std::invalid_argument(err);
     }
 
 public:
@@ -97,7 +98,7 @@ public:
         this->program_name = program_name;
     }
 
-    void parse_args(int argc, char **argv) noexcept
+    void parse_args(int argc, char **argv)
     {
         if (argc == 1)
         {
@@ -113,7 +114,6 @@ public:
                 if (pos_arg_i > 0)
                 {
                     error_message("Option " + std::string(argv[i]) + " has to be specified before the positional arguments!");
-                    exit(-1);
                 }
 
                 if (argv[i][1] == '-') // --option
@@ -132,7 +132,6 @@ public:
                         if (i + 1 >= argc && arg->type != FLAG)
                         {
                             error_message("Option --" + arg_name + " needs a value!");
-                            exit(-1);
                         }
 
                         arg->is_set = true;
@@ -146,13 +145,11 @@ public:
                     else
                     {
                         error_message("Option --" + arg_name + " does not exist!");
-                        exit(-1);
                     }
                 }
                 else // -o
                 {
                     error_message(std::string(argv[i]) + " is not a valid option. Options start with two dashes -- !");
-                    exit(-1);
                 }
             }
             else
@@ -163,7 +160,6 @@ public:
                     if (std::find_if(subprograms.begin(), subprograms.end(), [this](const std::tuple<std::string, std::string> & t){ return std::get<0>(t) == selected_subprogram; }) == subprograms.end())
                     {
                         error_message(selected_subprogram + " is not a valid tool name!");
-                        exit(-1);
                     }
                     break; // this will ignore everything else that will follow
                 }
@@ -176,7 +172,6 @@ public:
                     else
                     {
                         error_message("More positional arguments passed than allowed!");
-                        exit(-1);
                     }
                 }
                 pos_args[pos_arg_i].is_set = true;
@@ -186,7 +181,7 @@ public:
         }
     }
 
-    void check_args() const noexcept
+    void check_args() const
     {
         // check whether the required positional arguments are given
         for (size_t pos_arg_i = 0; pos_arg_i < pos_args.size() && pos_args[pos_arg_i].is_required; ++pos_arg_i)
@@ -194,7 +189,6 @@ public:
             if (!pos_args[pos_arg_i].is_set)
             {
                 error_message("Positional argument for '" + pos_args[pos_arg_i].name + "' missing!");
-                exit(-1);
             }
 
             // if (argc == 1) // no arguments/options passed
@@ -210,14 +204,13 @@ public:
             if (a.is_required && !a.is_set)
             {
                 error_message("Option --" + a.name + " required!");
-                exit(-1);
             }
         }
     }
 
-    std::string get_selected_subprogram() const noexcept
+    std::string get_selected_subprogram() const
     {
-        assert(!subprograms.empty());
+        if(subprograms.empty()) throw std::logic_error("No subprograms defined");
         return selected_subprogram;
     }
 
@@ -227,7 +220,6 @@ public:
         if (find(args, name) != args.end()) // option already exists
         {
             error_message("Option '" + name + "' cannot be defined twice!");
-            exit(-1);
         }
 #endif
 
@@ -251,17 +243,15 @@ public:
         if (find(pos_args, name) != pos_args.end()) // option already exists
         {
             error_message("Argument '" + name + "' cannot be defined twice!");
-            exit(-1);
         }
 
         if (pos_args.size() > 0 && !pos_args.back().is_required && required) // option already existed
         {
             error_message("Cannot create the required positional argument '" + name + "' after an optional one!");
-            exit(-1);
         }
 #endif
 
-        assert(!this->allow_more_pos_arguments); // allow_more_pos_arguments can only be true for the last positional argument
+        if(this->allow_more_pos_arguments) throw std::logic_error("Cannot have more than one variadic positional argument"); // allow_more_pos_arguments can only be true for the last positional argument
         this->allow_more_pos_arguments = allow_more_pos_arguments;
 
         if (name.size() + 2 > longest_opt_arg) // account for < and > prefix/suffix
@@ -273,15 +263,15 @@ public:
     bool is_set(std::string && s) const
     {
         auto it = find(args, s);
-        assert(it != args.end());
+        if(it == args.end()) throw std::logic_error("Option not found: " + s);
 
         return it->is_set;
     }
 
-    std::string get_string(std::string && s) const noexcept
+    std::string get_string(std::string && s) const
     {
         auto it = find(args, s);
-        assert(it != args.end());
+        if(it == args.end()) throw std::logic_error("Option not found: " + s);
 
         return it->value;
     }
@@ -289,7 +279,7 @@ public:
     int64_t get_int(std::string && s) const
     {
         auto it = find(args, s);
-        assert(it != args.end());
+        if(it == args.end()) throw std::logic_error("Option not found: " + s);
 
         try
         {
@@ -298,14 +288,13 @@ public:
         catch (const std::exception& ia)
         {
             error_message("Option --" + s + " needs an integer value!");
-            exit(-1);
         }
     }
 
     bool get_bool(std::string && s) const
     {
         auto it = find(args, s);
-        assert(it != args.end());
+        if(it == args.end()) throw std::logic_error("Option not found: " + s);
 
         std::string val = it->value;
         std::transform(val.begin(), val.end(), val.begin(), [](unsigned char c){ return std::tolower(c); });
@@ -316,7 +305,7 @@ public:
     float get_float(std::string && s) const
     {
         auto it = find(args, s);
-        assert(it != args.end());
+        if(it == args.end()) throw std::logic_error("Option not found: " + s);
 
         try
         {
@@ -325,14 +314,13 @@ public:
         catch (const std::exception& e)
         {
             error_message("Option --" + s + " needs a float value!");
-            exit(-1);
         }
     }
 
     bool is_set_positional(std::string && s) const
     {
         auto it = find(pos_args, s);
-        assert(it != args.end());
+        if(it == args.end()) throw std::logic_error("Option not found: " + s);
 
         return it->is_set;
     }
@@ -340,12 +328,12 @@ public:
     std::string get_positional_argument(std::string && s) const
     {
         auto it = find(pos_args, s);
-        assert(it != pos_args.end());
+        if(it == pos_args.end()) throw std::logic_error("Positional argument not found: " + s);
 
         return it->value;
     }
 
-    std::string get_positional_argument(size_t index) const noexcept
+    std::string get_positional_argument(size_t index) const
     {
         assert(index < pos_args.size());
 

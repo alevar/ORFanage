@@ -259,8 +259,7 @@ public:
     bool overlap(int s, int e) const {
 #ifdef DEBUG
         if (s>e){
-            std::cerr<<"Overlapping failed: "<<s<<"\t"<<e<<std::endl;
-            exit(-1);
+            throw std::runtime_error("Overlapping failed: start " + std::to_string(s) + " > end " + std::to_string(e));
         }
 #endif
         return (this->get_start()<=e && this->get_end()>=s);
@@ -361,71 +360,72 @@ public:
         return full_inter_len;
     }
 
-    int next_position(int cp, bool forward){ // returns coordinates of the next position available to extend the cds within the current transcript // TODO: optimize - should not repeat the search for the first exon
-        if(forward){
-            for(auto& e : this->chain){
-                int es = e.get_start(), ee = e.get_end();
-                if(cp<es){return es;} // special case for when "cp" matches the last base of the exon
-                if(cp>=es && cp<ee){return std::max(cp+1,es);}
-            }
-        }
-        else{
-            for(int eidx=this->chain.size()-1;eidx>=0;eidx--){
-                int es = this->chain[eidx].get_start(), ee = this->chain[eidx].get_end();
-                if(cp>ee){return ee;}
-                if(cp>es && cp<=ee){return std::min(cp-1,ee);}
-            }
-        }
-        return -1; // returns -1 if the function couldn't find the next position
-    }
+
 
     void extend(CHAIN& c2,int numbp,bool forward){
-        int lp = forward ? this->get_end() : this->get_start();
-        for(int i=0;i<numbp;i++){
-            int np = c2.next_position(lp,forward); // TODO: this next_position thing is extremely inefficient...
-            int dist = std::abs(np-lp);
-            lp = np;
-            if(dist>1){ // create new exon
-                if(forward){
-                    this->chain.push_back(SEGTP(np,np));
+        if (numbp <= 0) return;
+        int rem = numbp;
+        int num_segs = c2.chain.size();
+        int start_i = forward ? 0 : num_segs - 1;
+        int end_i = forward ? num_segs : -1;
+        int step = forward ? 1 : -1;
+
+        for (int i = start_i; i != end_i; i += step) {
+            auto& e = c2.chain[i];
+            int lp = forward ? this->chain.back().get_end() : this->chain.front().get_start();
+            int es = e.get_start(), ee = e.get_end();
+            if (forward && lp >= ee) continue;
+            if (!forward && lp <= es) continue;
+            
+            int cur = forward ? std::max(lp + 1, es) : std::min(lp - 1, ee);
+            int avail = forward ? (ee - cur + 1) : (cur - es + 1);
+            if (avail > 0) {
+                int take = std::min(rem, avail);
+                if (forward) {
+                    int end_pos = cur + take - 1;
+                    if (cur - lp > 1) this->chain.push_back(SEGTP(cur, end_pos));
+                    else this->chain.back().set_end(end_pos);
+                } else {
+                    int start_pos = cur - take + 1;
+                    if (lp - cur > 1) this->chain.insert(this->chain.begin(), SEGTP(start_pos, cur));
+                    else this->chain.front().set_start(start_pos);
                 }
-                else{
-                    this->chain.insert(this->chain.begin(),SEGTP(np,np)); // TODO: inefficient
-                }
-            }
-            if(forward){
-                this->chain.back().set_end(np);
-            }
-            else{
-                this->chain.front().set_start(np);
+                rem -= take;
+                if (rem == 0) break;
             }
         }
     }
+
     void extend_to_pos(CHAIN& c2,int pos,bool forward){
-        int lp = forward ? this->get_end() : this->get_start();
-        int i=0;
-        while(true){
-            int np = c2.next_position(lp,forward);
-            int dist = std::abs(np-lp);
-            lp = np;
-            if(dist>1){ // create new exon
-                if(forward){
-                    this->chain.push_back(SEGTP(np,np));
-                }
-                else{
-                    this->chain.insert(this->chain.begin(),SEGTP(np,np)); // TODO: inefficient
-                }
+        int num_segs = c2.chain.size();
+        int start_i = forward ? 0 : num_segs - 1;
+        int end_i = forward ? num_segs : -1;
+        int step = forward ? 1 : -1;
+
+        for (int i = start_i; i != end_i; i += step) {
+            auto& e = c2.chain[i];
+            int lp = forward ? this->chain.back().get_end() : this->chain.front().get_start();
+            int es = e.get_start(), ee = e.get_end();
+            
+            if (forward && lp >= ee) continue;
+            if (!forward && lp <= es) continue;
+            
+            int cur = forward ? std::max(lp + 1, es) : std::min(lp - 1, ee);
+            if ((forward && cur > pos) || (!forward && cur < pos)) break;
+            
+            if (forward) {
+                int end_pos = std::min(ee, pos);
+                if (end_pos < cur) continue;
+                if (cur - lp > 1) this->chain.push_back(SEGTP(cur, end_pos));
+                else this->chain.back().set_end(end_pos);
+                if (end_pos == pos) break;
+            } else {
+                int start_pos = std::max(es, pos);
+                if (start_pos > cur) continue;
+                if (lp - cur > 1) this->chain.insert(this->chain.begin(), SEGTP(start_pos, cur));
+                else this->chain.front().set_start(start_pos);
+                if (start_pos == pos) break;
             }
-            if(forward){
-                this->chain.back().set_end(np);
-            }
-            else{
-                this->chain.front().set_start(np);
-            }
-            if(np==pos){ // found requested position
-                break;
-            }
-            i++;
         }
     }
 
@@ -461,44 +461,23 @@ public:
         return strand=='+' ? chain_pos : (this->clen()-chain_pos)-1;
     }
     int nt2genome(int zero_pos,char strand){ // tells which coordinate on the chain corresponds to the coordinate on the nt
-        int chain_pos = -1;
         int left_to_stop = zero_pos;
-        bool found_pos = false;
-        if(strand=='+'){
-            for(int i=0;i<this->chain.size();i++){
-                size_t clen = this->chain[i].slen();
-                if(left_to_stop<clen){ // found the segment with the stop codon
-                    chain_pos = this->chain[i].get_start()+left_to_stop;
-                    found_pos = true;
-                    break;
-                }
-                left_to_stop-=clen;
+        int num_segs = this->chain.size();
+        int start_i = strand == '+' ? 0 : num_segs - 1;
+        int end_i = strand == '+' ? num_segs : -1;
+        int step = strand == '+' ? 1 : -1;
+
+        for (int i = start_i; i != end_i; i += step) {
+            size_t clen = this->chain[i].slen();
+            if (left_to_stop < clen) { // found the segment
+                return strand == '+' ? this->chain[i].get_start() + left_to_stop 
+                                     : this->chain[i].get_end() - left_to_stop;
             }
-            if(!found_pos){ // return the last position
-                chain_pos = this->chain.back().get_end();
-            }
+            left_to_stop -= clen;
         }
-        else{
-            for(int i=chain.size()-1;i>=0;i--){
-                size_t clen = this->chain[i].slen();
-                if(left_to_stop<clen){ // found the cds segment with the stop codon
-                    chain_pos = this->chain[i].get_end()-left_to_stop;
-                    found_pos = true;
-                    break;
-                }
-                left_to_stop-=clen;
-            }
-            if(!found_pos){ // return the last position
-                chain_pos = this->chain[0].get_start();
-            }
-        }
-#ifdef DEBUG
-        if(chain_pos<0){
-            std::cerr<<"unexpected chain_pos<0"<<std::endl;
-            exit(-1);
-        }
-#endif
-        return chain_pos;
+        
+        // return the last position if over-requested
+        return strand == '+' ? this->chain.back().get_end() : this->chain.front().get_start();
     }
 
     void trim_to_pos(int start_nt_pos, int end_nt_pos,char strand){ // from stop indicates whether we are trimming the end or the start of the sequence
@@ -515,38 +494,20 @@ public:
     }
 
     int get_phase(int pos,char strand){ // returns the phase of coordinate in the provided chain
-        int cdsacc = strand=='+' ? this->chain.front().get_phase() : this->chain.back().get_phase();
         int phase = strand=='+' ? this->chain.front().get_phase() : this->chain.back().get_phase();
         bool found_pos = false;
-        if(strand=='+'){ // TODO: can be simplified to not have the giant if-else
-            for(auto & c : this->chain){
-                int cs = c.get_start();
-                int ce = c.get_end();
-                if(pos>=cs && pos<=ce){ // found the cds segment with the requested position
-                    phase = c.get_phase(pos,strand);
-                    found_pos = true;
-                    break;
-                }
-            }
-        }
-        else{
-            for(int i=this->chain.size()-1;i>=0;i--){
-                int cs = this->chain[i].get_start();
-                int ce = this->chain[i].get_end();
-                if(pos>=cs && pos<=ce){ // found the cds segment with the stop codon
-                    phase = this->chain[i].get_phase(pos,strand);
-                    found_pos = true;
-                    break;
-                }
+        for (auto& c : this->chain) { // Traversal order doesn't matter for finding a single inclusion
+            if (pos >= c.get_start() && pos <= c.get_end()) {
+                phase = c.get_phase(pos, strand);
+                found_pos = true;
+                break;
             }
         }
 #ifdef DEBUG
         if(!found_pos){
-            std::cerr<<"position not found"<<std::endl;
-            exit(-1);
+            throw std::runtime_error("Position not found");
         }
 #endif
-
         return phase;
     }
 
@@ -595,6 +556,7 @@ public:
             }
         }
     }
+    inline const std::vector<SEGTP>& get_segments() const { return this->chain; }
 
 protected:
     std::vector<SEGTP> chain;
@@ -632,9 +594,9 @@ public:
         this->ref_tx = tmpl.ref_tx;
     }
 
-    void set_tid(std::string new_tid) {this->tid = new_tid;}
+    void set_tid(const std::string& new_tid) {this->tid = new_tid;}
     bool has_cds() const {return this->is_coding;}
-    void set_cds_source(std::string new_source){this->cds_source = new_source;}
+    void set_cds_source(const std::string& new_source){this->cds_source = new_source;}
     void set_cds_start(int cs){this->cds_start = cs;}
     void set_cds_end(int ce){this->cds_end = ce;}
     void set_cds_phase(int start_phase);
@@ -661,7 +623,7 @@ public:
     bool overlap(int s,int e) const{return this->exons.overlap(s,e);}
     void build_cds();
     void remove_cds();
-    bool add_attribute(std::string k,std::string v);
+    bool add_attribute(const std::string& k,const std::string& v);
     std::string get_attributes() const;
     void set_bundle_ref(Bundle* b);
     void remove_bundle_ref(){this->bundle = nullptr;}
@@ -759,7 +721,7 @@ public:
         }
     }
 
-    int merge(TX& tx){
+    int merge(const TX& tx){
         this->dup_tids.insert(tx.dup_tids.begin(), tx.dup_tids.end() );
         this->dup_tids.insert(tx.get_tid());
         return this->dup_tids.size();
@@ -1031,8 +993,7 @@ public:
 private:
     uint map(uint i){
         if(i-1>=this->mat.size()){
-            std::cerr<<"Out of bounds index in the compmat"<<std::endl;
-            exit(4);
+            throw std::runtime_error("Out of bounds index in the compmat");
         }
         return i-1;
     }

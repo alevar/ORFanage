@@ -32,9 +32,7 @@ struct Parameters{
     std::ofstream out_fp;
 } global_params;
 
-std::string get_score_string(Score& s) {
 
-}
 
 int run(){
     #ifdef DEBUG
@@ -185,10 +183,10 @@ int main(int argc, char** argv) {
     
     args.add_option("help", ArgParse::Type::FLAG, "Prints this help message.", ArgParse::Level::HELP, false);
 
-    args.parse_args(argc, argv);
-    args.check_args();
-
     try {
+        args.parse_args(argc, argv);
+        args.check_args();
+
         // first create the execution string
     std::string cl = "orfcompare ";
     for (int i = 0; i < argc; i++) {
@@ -203,14 +201,12 @@ int main(int argc, char** argv) {
     // check that all files exist
     global_params.query_fname = args.get_string("query");
     if(!file_exists(global_params.query_fname)){
-        std::cerr << "Query file does not exist! "<<args.get_string("query")<<std::endl;
-        exit(2);
+        throw std::runtime_error("Query file does not exist! " + args.get_string("query"));
     }
 
     global_params.template_fname = args.get_string("template");
     if(!file_exists(global_params.template_fname)){
-        std::cerr << "Template file does not exist! "<<args.get_string("template")<<std::endl;
-        exit(2);
+        throw std::runtime_error("Template file does not exist! " + args.get_string("template"));
     }
 
     global_params.num_threads = args.is_set("threads") ? args.get_int("threads") : 1;
@@ -227,8 +223,7 @@ int main(int argc, char** argv) {
     if(args.is_set("reference")){ // much from gpertea bamcons.cpp
         global_params.reference_fasta_fname = args.get_string("reference");
         if(!file_exists(global_params.reference_fasta_fname)){
-            std::cerr << "Reference FASTA file does not exist!\n";
-            exit(2);
+            throw std::runtime_error("Reference FASTA file does not exist!");
         }
 
         // get potential fasta index file name
@@ -238,17 +233,14 @@ int main(int argc, char** argv) {
             std::cerr<<"No fasta index found for "<<fa_idx_fname<<". Building now"<<std::endl;
             faIdx.buildIndex();
             if (faIdx.getCount() == 0){
-                std::cerr<<"Error: no fasta records found!"<<std::endl;
-                exit(2);
+                throw std::runtime_error("Error: no fasta records found!");
             }
             FILE* fcreate = fopen(fa_idx_fname.c_str(), "w");
             if (fcreate == nullptr){
-                std::cerr<<"Error: cannot create fasta index: "<<fa_idx_fname<<std::endl;
-                exit(2);
+                throw std::runtime_error("Error: cannot create fasta index: " + fa_idx_fname);
             }
             if (faIdx.storeIndex(fcreate) < faIdx.getCount()){
-                std::cerr<<"Warning: error writing the index file!"<<std::endl;
-                exit(2);
+                throw std::runtime_error("Warning: error writing the index file!");
             }
             std::cerr<<"FASTA index rebuilt."<<std::endl;
         }
