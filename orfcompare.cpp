@@ -188,7 +188,8 @@ int main(int argc, char** argv) {
     args.parse_args(argc, argv);
     args.check_args();
 
-    // first create the execution string
+    try {
+        // first create the execution string
     std::string cl = "orfcompare ";
     for (int i = 0; i < argc; i++) {
         if (i == 0) {
@@ -277,6 +278,10 @@ int main(int argc, char** argv) {
 
     global_params.out_fp.close();
 
-    return 0;
+        return 0;
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        return 1;
+    }
 }
 #pragma clang diagnostic pop

@@ -784,6 +784,38 @@ GFaSeqGet* Transcriptome::get_fasta_seq(int seqid){
 uint Transcriptome::bundleup(bool use_id, uint32_t overhang,bool spliced_extend){ // create bundles and return the total number of bundles
     // if rescue_len is enabled - will extend bundles by that number of bases to enable rescue lookup up and down stream of the original locus coordinates
     this->sort(use_id);
+
+    if (this->check_ref) {
+        std::vector<TX> valid_txs;
+        int current_seqid = -1;
+        bool current_seq_valid = false;
+        std::string seq_name;
+
+        for (auto& t : this->tx_vec) {
+            if (t.get_seqid() != current_seqid) {
+                current_seqid = t.get_seqid();
+                int res = this->seqid2name(current_seqid, seq_name);
+                assert(res == 0);
+                GFaSeqGet* seq = fastaSeqGet(gfasta, seq_name.c_str());
+                current_seq_valid = (seq != nullptr);
+            }
+
+            if (!current_seq_valid) {
+                if (!t.is_template()) {
+                    throw std::runtime_error("Reference FASTA is missing sequence for query: " + seq_name);
+                }
+            } else {
+                valid_txs.push_back(t);
+            }
+        }
+        this->tx_vec = valid_txs;
+    }
+
+    if (this->tx_vec.empty()) {
+        this->bundles.clear();
+        return 0;
+    }
+
     this->bundles.clear();
     this->bundles.push_back(Bundle());
 
